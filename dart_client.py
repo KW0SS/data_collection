@@ -1,5 +1,6 @@
 import json
 import os
+import ssl
 import urllib.parse
 import urllib.request
 import zipfile
@@ -49,7 +50,14 @@ def get_api_key(explicit_key: str | None = None) -> str:
 def _http_get(url: str, params: dict, timeout: int = 30) -> bytes:
     query = urllib.parse.urlencode(params)
     req = urllib.request.Request(f"{url}?{query}", method="GET")
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
+    context = None
+    try:
+        import certifi
+
+        context = ssl.create_default_context(cafile=certifi.where())
+    except Exception:
+        context = None
+    with urllib.request.urlopen(req, timeout=timeout, context=context) as resp:
         return resp.read()
 
 
