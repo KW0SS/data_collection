@@ -15,7 +15,10 @@ python collect.py collect --stock-codes 019440 --years 2023 -o data/output/my_fo
 # 4) 원본 재무제표 JSON도 함께 저장
 python collect.py collect --stock-codes 019440 --years 2023 --save-raw
 
-# 5) 기업 검색 (DART corp_code 조회)
+# 5) S3에 GICS 섹터별로 원본 데이터 업로드 (기업 목록 CSV에 gics_sector 필요)
+python collect.py collect --companies data/input/companies.csv --years 2023 --upload-s3
+
+# 6) 기업 검색 (DART corp_code 조회)
 python collect.py search --name 세아특수강
 python collect.py search --stock-code 019440
 """
@@ -53,6 +56,9 @@ def cmd_collect(args: argparse.Namespace) -> int:
             api_key=args.api_key,
             delay=args.delay,
             save_raw=args.save_raw,
+            upload_s3=args.upload_s3,
+            s3_bucket=args.s3_bucket,
+            s3_region=args.s3_region,
         )
         print(f"결과 파일 ({len(saved_files)}개):")
         for f in saved_files:
@@ -139,6 +145,18 @@ def build_parser() -> argparse.ArgumentParser:
     collect_p.add_argument(
         "--save-raw", action="store_true",
         help="원본 재무제표 JSON을 data/raw/에 저장"
+    )
+    collect_p.add_argument(
+        "--upload-s3", action="store_true",
+        help="원본 재무제표 JSON을 S3에 업로드 (GICS 섹터별 디렉터리)"
+    )
+    collect_p.add_argument(
+        "--s3-bucket",
+        help="S3 버킷 이름 (없으면 .env의 S3_BUCKET_NAME 사용)"
+    )
+    collect_p.add_argument(
+        "--s3-region",
+        help="AWS 리전 (없으면 .env의 S3_REGION 또는 ap-northeast-2)"
     )
     collect_p.set_defaults(func=cmd_collect)
 

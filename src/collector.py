@@ -1,6 +1,7 @@
 """데이터 수집 오케스트레이터.
 
 기업 목록(CSV or 직접 입력) + 연도 범위 → 분기별 재무비율 CSV 출력.
+선택적으로 원본 재무제표 JSON을 로컬(data/raw/) 또는 S3에 저장.
 """
 
 from __future__ import annotations
@@ -21,6 +22,7 @@ from .dart_api import (
 )
 from .account_mapper import extract_standard_items
 from .ratio_calculator import RATIO_NAMES, compute_all_ratios
+from .s3_uploader import upload_batch_to_s3
 
 # ── 기본 경로 ─────────────────────────────────────────────────
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
@@ -86,13 +88,14 @@ def collect_single(
     quarter: str,
     fs_div: str = "CFS",
     save_raw: bool = False,
-) -> dict[str, Any]:
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """
     한 기업의 한 분기 재무비율을 수집.
 
     Returns:
-        {"stock_code": ..., "corp_name": ..., "year": ..., "quarter": ...,
-         "비율1": val, "비율2": val, ...}
+        (ratio_row, raw_items) 튜플.
+        ratio_row: {"stock_code": ..., "corp_name": ..., "비율1": val, ...}
+        raw_items: DART 원본 데이터 (데이터 없으면 빈 리스트)
     """
     reprt_code = REPORT_CODES[quarter]
     try:
@@ -107,7 +110,6 @@ def collect_single(
         _save_raw_json(raw_items, stock_code, year, quarter, fs_div)
 
     if not raw_items:
-        # 데이터 없음 → 모든 비율 None
         ratios = {name: None for name in RATIO_NAMES}
     else:
         std_items = extract_standard_items(raw_items)
@@ -120,7 +122,7 @@ def collect_single(
         "quarter": quarter,
     }
     row.update(ratios)
-    return row
+    return row, raw_items
 
 
 # ── 배치 수집 ─────────────────────────────────────────────────
@@ -135,6 +137,9 @@ def collect_batch(
     api_key: str | None = None,
     delay: float = 0.5,
     save_raw: bool = False,
+    upload_s3: bool = False,
+    s3_bucket: str | None = None,
+    s3_region: str | None = None,
 ) -> list[Path]:
     """
     여러 기업 × 연도 × 분기의 재무비율을 수집하여 CSV 저장.
@@ -157,6 +162,9 @@ def collect_batch(
         api_key: DART API 키
         delay: API 호출 간 대기 시간(초)
         save_raw: 원본 재무제표 JSON을 data/raw/에 저장할지 여부
+        upload_s3: 원본 재무제표를 S3에 업로드할지 여부
+        s3_bucket: S3 버킷 이름 (없으면 .env에서 읽기)
+        s3_region: AWS 리전 (없으면 .env에서 읽기)
 
     Returns:
         저장된 CSV 파일 경로 리스트
@@ -198,6 +206,7 @@ def collect_batch(
 
     # 결과 수집
     all_rows: list[dict[str, Any]] = []
+    s3_upload_queue: list[dict[str, Any]] = []  # S3 업로드 대기열
     total = len(companies) * len(years) * len(quarters)
     done = 0
 
@@ -205,6 +214,7 @@ def collect_batch(
         cc = comp.get("corp_code", "")
         sc = comp.get("stock_code", "")
         cn = comp.get("corp_name", "")
+        gics = comp.get("gics_sector", "Unknown")
         if not cc:
             print(f"  ⏭ 건너뜀 (corp_code 없음): {sc} {cn}", file=sys.stderr)
             done += len(years) * len(quarters)
@@ -216,13 +226,23 @@ def collect_batch(
                 print(f"  [{done}/{total}] {cn or sc} {yr}-{q} ...", file=sys.stderr)
 
                 # CFS 시도 → 실패하면 OFS 폴백
-                row = collect_single(key, cc, sc, cn, yr, q, fs_div, save_raw=save_raw)
+                row, raw_items = collect_single(key, cc, sc, cn, yr, q, fs_div, save_raw=save_raw)
                 # CFS에서 데이터가 비어 있으면 OFS로 재시도
                 if fs_div == "CFS" and all(row.get(n) is None for n in RATIO_NAMES):
-                    row = collect_single(key, cc, sc, cn, yr, q, "OFS", save_raw=save_raw)
+                    row, raw_items = collect_single(key, cc, sc, cn, yr, q, "OFS", save_raw=save_raw)
 
                 row["label"] = comp.get("label", "")
                 all_rows.append(row)
+
+                # S3 업로드 대기열에 추가
+                if upload_s3 and raw_items:
+                    s3_upload_queue.append({
+                        "raw_items": raw_items,
+                        "stock_code": sc,
+                        "year": yr,
+                        "quarter": q,
+                        "gics_sector": gics,
+                    })
 
                 if delay > 0:
                     time.sleep(delay)
@@ -252,5 +272,11 @@ def collect_batch(
         saved_files.append(filepath)
         print(f"  📄 {filepath}  ({len(rows)}행)", file=sys.stderr)
 
-    print(f"\n✅ 저장 완료: {save_dir}/  (총 {len(saved_files)}개 파일, {len(all_rows)}행)", file=sys.stderr)
+    print(f"\n✅ CSV 저장 완료: {save_dir}/  (총 {len(saved_files)}개 파일, {len(all_rows)}행)", file=sys.stderr)
+
+    # ── S3 업로드 ─────────────────────────────────────────────
+    if upload_s3 and s3_upload_queue:
+        print(f"\n☁️  S3 업로드 시작 ({len(s3_upload_queue)}개 파일)...", file=sys.stderr)
+        upload_batch_to_s3(s3_upload_queue, bucket=s3_bucket, region=s3_region)
+
     return saved_files

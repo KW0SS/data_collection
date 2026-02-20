@@ -14,14 +14,15 @@ data_collection/
 │   ├── dart_api.py                 # OpenDART API 클라이언트
 │   ├── account_mapper.py           # DART 계정과목명 → 표준 키 매핑
 │   ├── ratio_calculator.py         # 30개 재무비율 계산기
-│   └── collector.py                # 데이터 수집 오케스트레이터
+│   ├── collector.py                # 데이터 수집 오케스트레이터
+│   └── s3_uploader.py              # S3 업로드 모듈 (GICS 섹터별)
 ├── data/
 │   ├── input/                      # 기업 목록 CSV (사용자 작성)
 │   │   └── companies_template.csv
 │   ├── output/                     # 결과 재무비율 CSV
 │   └── raw/                        # 원본 재무제표 JSON (선택)
 ├── requirements.txt
-└── .env                            # DART_API_KEY 설정
+└── .env                            # API 키 및 S3 설정
 ```
 
 ---
@@ -37,10 +38,16 @@ data_collection/
 
 ## 설정
 
-`.env` 파일을 프로젝트 루트에 생성하고 API 키를 추가합니다:
+`.env` 파일을 프로젝트 루트에 생성하고 아래 설정을 추가합니다:
 
 ```
 DART_API_KEY=발급받은_API_키
+
+# S3 업로드 기능 사용 시 (--upload-s3)
+S3_ACCESS_KEY=AWS_Access_Key_ID
+S3_PRIVATE_KEY=AWS_Secret_Access_Key
+S3_BUCKET_NAME=my-bucket-name
+S3_REGION=ap-northeast-2          # 선택 (기본: ap-northeast-2)
 ```
 
 ---
@@ -64,6 +71,12 @@ python3 collect.py collect --stock-codes 019440 --years 2023 -o data/output/my_f
 
 # 원본 재무제표 JSON도 함께 저장
 python3 collect.py collect --stock-codes 019440 --years 2023 --save-raw
+
+# S3에 GICS 섹터별로 원본 데이터 업로드 (기업 목록 CSV에 gics_sector 필요)
+python3 collect.py collect --companies data/input/companies.csv --years 2023 --upload-s3
+
+# S3 버킷 직접 지정
+python3 collect.py collect --companies data/input/companies.csv --years 2023 --upload-s3 --s3-bucket my-bucket
 ```
 
 **파일명 규칙:** `{종목코드}_{연도}.csv` (예: `019440_2023.csv`)
@@ -73,10 +86,10 @@ python3 collect.py collect --stock-codes 019440 --years 2023 --save-raw
 `data/input/companies.csv` 작성:
 
 ```csv
-stock_code,corp_name,label
-019440,세아특수강,1
-005930,삼성전자,0
-035720,카카오,0
+stock_code,corp_name,label,gics_sector
+019440,세아특수강,1,Materials
+005930,삼성전자,0,Information Technology
+035720,카카오,0,Communication Services
 ```
 
 | 컬럼 | 설명 |
@@ -84,6 +97,7 @@ stock_code,corp_name,label
 | `stock_code` | 종목코드 (6자리) |
 | `corp_name` | 기업명 (참고용) |
 | `label` | 0=정상, 1=상폐 (모델 학습용 라벨) |
+| `gics_sector` | GICS 섹터명 (S3 업로드 시 디렉터리 구분에 사용) |
 
 ```bash
 python3 collect.py collect --companies data/input/companies.csv --years 2020 2021 2022 2023
@@ -107,7 +121,10 @@ collect.py collect
   --quarters          수집 분기 (Q1, H1, Q3, ANNUAL / 기본: 전체)
   --fs-div            CFS=연결재무제표, OFS=별도재무제표 (기본: CFS)
   --output-dir, -o    결과 CSV 저장 디렉터리 (기본: data/output/)
-  --save-raw          원본 재무제표 JSON 저장 여부
+  --save-raw          원본 재무제표 JSON을 data/raw/에 저장
+  --upload-s3         원본 재무제표 JSON을 S3에 GICS 섹터별로 업로드
+  --s3-bucket         S3 버킷 이름 (없으면 .env의 S3_BUCKET_NAME)
+  --s3-region         AWS 리전 (없으면 .env의 S3_REGION / 기본: ap-northeast-2)
   --delay             API 호출 간 대기 초 (기본: 0.5)
 
 collect.py search
@@ -338,6 +355,48 @@ python3 collect.py collect --stock-codes 019440 --years 2023 --save-raw
 - **재현성:** 나중에 비율 산출 공식을 변경하더라도 API를 다시 호출하지 않고 재계산 가능
 - **확장성:** 현재 30개 비율 외에 추가 분석이 필요할 때 원본에서 바로 추출 가능
 - **학술 연구:** 데이터의 출처와 근거를 명확히 남길 수 있음
+
+---
+
+## S3 업로드 (--upload-s3)
+
+`--upload-s3` 옵션을 사용하면 수집된 원본 재무제표 JSON을 AWS S3에 **GICS 섹터별 디렉터리**로 자동 업로드합니다.
+
+### 사전 준비
+
+1. `.env`에 S3 인증 정보 추가:
+   ```
+   S3_ACCESS_KEY=AKIA...
+   S3_PRIVATE_KEY=wJal...
+   S3_BUCKET_NAME=my-financial-data
+   S3_REGION=ap-northeast-2
+   ```
+2. boto3 설치: `pip3 install boto3`
+3. 기업 목록 CSV에 `gics_sector` 컬럼 추가
+
+### S3 저장 구조
+
+```
+s3://my-financial-data/
+├── Materials/
+│   ├── 019440_2023_Q1.json
+│   ├── 019440_2023_H1.json
+│   ├── 019440_2023_Q3.json
+│   └── 019440_2023_ANNUAL.json
+├── Information Technology/
+│   ├── 005930_2023_Q1.json
+│   └── ...
+└── Communication Services/
+    ├── 035720_2023_Q1.json
+    └── ...
+```
+
+### 동작 방식
+
+- S3에 지정한 버킷이 없으면 **자동 생성**
+- S3는 "디렉터리"가 아닌 key prefix로 동작하므로, 섹터 폴더도 **자동 생성**됨
+- 재무제표 데이터가 없는 분기(API 응답 빈 리스트)는 업로드하지 않음
+- `--upload-s3`와 `--save-raw`는 독립적으로 사용 가능 (동시 사용도 가능)
 
 ---
 
