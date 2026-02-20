@@ -52,6 +52,7 @@ def cmd_collect(args: argparse.Namespace) -> int:
             output_path=Path(args.output) if args.output else None,
             api_key=args.api_key,
             delay=args.delay,
+            save_raw=args.save_raw,
         )
         print(f"결과 파일: {output}")
         return 0
@@ -132,6 +133,10 @@ def build_parser() -> argparse.ArgumentParser:
     collect_p.add_argument(
         "--delay", type=float, default=0.5,
         help="API 호출 간 대기(초). OpenDART 분당 제한 방지 (기본: 0.5)"
+    )
+    collect_p.add_argument(
+        "--save-raw", action="store_true",
+        help="원본 재무제표 JSON을 data/raw/에 저장"
     )
     collect_p.set_defaults(func=cmd_collect)
 

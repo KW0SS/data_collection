@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import csv
+import json
 import sys
 import time
 from pathlib import Path
@@ -25,11 +26,30 @@ from .ratio_calculator import RATIO_NAMES, compute_all_ratios
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 OUTPUT_DIR = DATA_DIR / "output"
 INPUT_DIR = DATA_DIR / "input"
+RAW_DIR = DATA_DIR / "raw"
 
 
-def _ensure_dirs() -> None:
+def _ensure_dirs(save_raw: bool = False) -> None:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     INPUT_DIR.mkdir(parents=True, exist_ok=True)
+    if save_raw:
+        RAW_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _save_raw_json(
+    raw_items: list[dict[str, Any]],
+    stock_code: str,
+    year: str,
+    quarter: str,
+    fs_div: str,
+) -> None:
+    """원본 재무제표 JSON을 data/raw/ 폴더에 저장."""
+    filename = f"{stock_code}_{year}_{quarter}_{fs_div}.json"
+    path = RAW_DIR / filename
+    path.write_text(
+        json.dumps(raw_items, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
 
 
 # ── CSV 입력 파싱 ─────────────────────────────────────────────
@@ -65,6 +85,7 @@ def collect_single(
     year: str,
     quarter: str,
     fs_div: str = "CFS",
+    save_raw: bool = False,
 ) -> dict[str, Any]:
     """
     한 기업의 한 분기 재무비율을 수집.
@@ -81,6 +102,9 @@ def collect_single(
     except DartApiError as e:
         print(f"  ⚠ API 오류 ({corp_name} {year}-{quarter}): {e}", file=sys.stderr)
         raw_items = []
+
+    if raw_items and save_raw:
+        _save_raw_json(raw_items, stock_code, year, quarter, fs_div)
 
     if not raw_items:
         # 데이터 없음 → 모든 비율 None
@@ -110,6 +134,7 @@ def collect_batch(
     output_path: Path | None = None,
     api_key: str | None = None,
     delay: float = 0.5,
+    save_raw: bool = False,
 ) -> Path:
     """
     여러 기업 × 연도 × 분기의 재무비율을 수집하여 CSV 저장.
@@ -128,11 +153,12 @@ def collect_batch(
         output_path: 결과 CSV 저장 경로
         api_key: DART API 키
         delay: API 호출 간 대기 시간(초)
+        save_raw: 원본 재무제표 JSON을 data/raw/에 저장할지 여부
 
     Returns:
         저장된 CSV 파일 경로
     """
-    _ensure_dirs()
+    _ensure_dirs(save_raw=save_raw)
     key = get_api_key(api_key)
 
     if quarters is None:
@@ -187,10 +213,10 @@ def collect_batch(
                 print(f"  [{done}/{total}] {cn or sc} {yr}-{q} ...", file=sys.stderr)
 
                 # CFS 시도 → 실패하면 OFS 폴백
-                row = collect_single(key, cc, sc, cn, yr, q, fs_div)
+                row = collect_single(key, cc, sc, cn, yr, q, fs_div, save_raw=save_raw)
                 # CFS에서 데이터가 비어 있으면 OFS로 재시도
                 if fs_div == "CFS" and all(row.get(n) is None for n in RATIO_NAMES):
-                    row = collect_single(key, cc, sc, cn, yr, q, "OFS")
+                    row = collect_single(key, cc, sc, cn, yr, q, "OFS", save_raw=save_raw)
 
                 row["label"] = comp.get("label", "")
                 all_rows.append(row)
