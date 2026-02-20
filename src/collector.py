@@ -131,13 +131,16 @@ def collect_batch(
     quarters: list[str] | None = None,
     companies_csv: Path | None = None,
     fs_div: str = "CFS",
-    output_path: Path | None = None,
+    output_dir: Path | None = None,
     api_key: str | None = None,
     delay: float = 0.5,
     save_raw: bool = False,
-) -> Path:
+) -> list[Path]:
     """
     여러 기업 × 연도 × 분기의 재무비율을 수집하여 CSV 저장.
+
+    파일명 규칙: {종목코드}_{연도}.csv  (예: 019440_2023.csv)
+    각 기업 × 연도별로 별도의 CSV 파일로 저장됩니다.
 
     사용 방식 두 가지:
     1) companies_csv 지정 → CSV에서 기업 목록 로드
@@ -150,13 +153,13 @@ def collect_batch(
         quarters: 분기 리스트 (예: ["Q1", "H1", "Q3", "ANNUAL"])
         companies_csv: 기업 목록 CSV 파일 경로
         fs_div: "CFS" (연결) 또는 "OFS" (별도)
-        output_path: 결과 CSV 저장 경로
+        output_dir: 결과 CSV 저장 디렉터리 (기본: data/output/)
         api_key: DART API 키
         delay: API 호출 간 대기 시간(초)
         save_raw: 원본 재무제표 JSON을 data/raw/에 저장할지 여부
 
     Returns:
-        저장된 CSV 파일 경로
+        저장된 CSV 파일 경로 리스트
     """
     _ensure_dirs(save_raw=save_raw)
     key = get_api_key(api_key)
@@ -224,17 +227,30 @@ def collect_batch(
                 if delay > 0:
                     time.sleep(delay)
 
-    # CSV 저장
-    if output_path is None:
-        output_path = OUTPUT_DIR / "financial_ratios.csv"
-    output_path.parent.mkdir(parents=True, exist_ok=True)
+    # ── CSV 저장: 기업코드_연도.csv 별로 분리 ──────────────────
+    save_dir = output_dir if output_dir else OUTPUT_DIR
+    save_dir.mkdir(parents=True, exist_ok=True)
+
+    # (stock_code, year) 기준으로 그룹핑
+    from collections import defaultdict
+    groups: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
+    for row in all_rows:
+        key = (row["stock_code"], row["year"])
+        groups[key].append(row)
 
     fieldnames = ["stock_code", "corp_name", "year", "quarter", "label"] + RATIO_NAMES
-    with open(output_path, "w", newline="", encoding="utf-8-sig") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
-        writer.writeheader()
-        for row in all_rows:
-            writer.writerow(row)
+    saved_files: list[Path] = []
 
-    print(f"\n✅ 저장 완료: {output_path}  ({len(all_rows)}행)", file=sys.stderr)
-    return output_path
+    for (sc, yr), rows in groups.items():
+        filename = f"{sc}_{yr}.csv"
+        filepath = save_dir / filename
+        with open(filepath, "w", newline="", encoding="utf-8-sig") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
+            writer.writeheader()
+            for row in rows:
+                writer.writerow(row)
+        saved_files.append(filepath)
+        print(f"  📄 {filepath}  ({len(rows)}행)", file=sys.stderr)
+
+    print(f"\n✅ 저장 완료: {save_dir}/  (총 {len(saved_files)}개 파일, {len(all_rows)}행)", file=sys.stderr)
+    return saved_files

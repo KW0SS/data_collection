@@ -50,21 +50,23 @@ DART_API_KEY=발급받은_API_키
 ### 1) 종목코드로 직접 수집
 
 ```bash
-# 단일 기업, 특정 연도
+# 단일 기업, 특정 연도 → 019440_2023.csv 생성
 python3 collect.py collect --stock-codes 019440 --years 2023
 
-# 복수 기업, 복수 연도
+# 복수 기업, 복수 연도 → 019440_2020.csv ~ 005930_2023.csv 등 연도별 파일 생성
 python3 collect.py collect --stock-codes 019440 005930 --years 2020 2021 2022 2023
 
 # 특정 분기만 지정
 python3 collect.py collect --stock-codes 019440 --years 2023 --quarters Q1 ANNUAL
 
-# 결과 파일 경로 지정
-python3 collect.py collect --stock-codes 019440 --years 2023 -o data/output/seah_2023.csv
+# 저장 디렉터리 지정
+python3 collect.py collect --stock-codes 019440 --years 2023 -o data/output/my_folder/
 
 # 원본 재무제표 JSON도 함께 저장
 python3 collect.py collect --stock-codes 019440 --years 2023 --save-raw
 ```
+
+**파일명 규칙:** `{종목코드}_{연도}.csv` (예: `019440_2023.csv`)
 
 ### 2) 기업 목록 CSV로 배치 수집
 
@@ -99,20 +101,32 @@ python3 collect.py search --name 삼성 --limit 10
 
 ```
 collect.py collect
-  --stock-codes    종목코드 목록 (예: 019440 005930)
-  --companies      기업 목록 CSV 파일 경로
-  --years          수집 연도 (기본: 2023)
-  --quarters       수집 분기 (Q1, H1, Q3, ANNUAL / 기본: 전체)
-  --fs-div         CFS=연결재무제표, OFS=별도재무제표 (기본: CFS)
-  --output, -o     결과 CSV 파일 경로 (기본: data/output/financial_ratios.csv)
-  --save-raw       원본 재무제표 JSON 저장 여부
-  --delay          API 호출 간 대기 초 (기본: 0.5)
+  --stock-codes       종목코드 목록 (예: 019440 005930)
+  --companies         기업 목록 CSV 파일 경로
+  --years             수집 연도 (기본: 2023)
+  --quarters          수집 분기 (Q1, H1, Q3, ANNUAL / 기본: 전체)
+  --fs-div            CFS=연결재무제표, OFS=별도재무제표 (기본: CFS)
+  --output-dir, -o    결과 CSV 저장 디렉터리 (기본: data/output/)
+  --save-raw          원본 재무제표 JSON 저장 여부
+  --delay             API 호출 간 대기 초 (기본: 0.5)
 
 collect.py search
-  --name           기업명 검색어
-  --stock-code     종목코드
-  --refresh        기업코드 XML 새로 다운로드
-  --limit          최대 검색 결과 수 (기본: 20)
+  --name              기업명 검색어
+  --stock-code        종목코드
+  --refresh           기업코드 XML 새로 다운로드
+  --limit             최대 검색 결과 수 (기본: 20)
+```
+
+**파일 저장 구조 예시:**
+
+```
+data/output/
+├── 019440_2020.csv    # 세아특수강 2020년 (Q1, H1, Q3, ANNUAL)
+├── 019440_2021.csv    # 세아특수강 2021년
+├── 019440_2022.csv    # 세아특수강 2022년
+├── 019440_2023.csv    # 세아특수강 2023년
+├── 005930_2020.csv    # 삼성전자 2020년
+└── ...
 ```
 
 ---

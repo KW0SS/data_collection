@@ -3,21 +3,21 @@
 
 사용 예시
 ─────────
-# 1) 종목코드 직접 입력 (단일/복수)
-python collect.py --stock-codes 005930 035720 --years 2022 2023 --quarters Q1 H1 Q3 ANNUAL
+# 1) 종목코드 직접 입력 → 019440_2022.csv, 019440_2023.csv 생성
+python collect.py collect --stock-codes 019440 --years 2022 2023
 
-# 2) 기업 목록 CSV 파일 사용
-python collect.py --companies data/input/companies.csv --years 2021 2022 2023
+# 2) 기업 목록 CSV로 배치 수집
+python collect.py collect --companies data/input/companies.csv --years 2021 2022 2023
 
-# 3) 연도·분기 기본값(전체 분기, 2023년)으로 단일 기업 조회
-python collect.py --stock-codes 005930
+# 3) 저장 디렉터리 지정
+python collect.py collect --stock-codes 019440 --years 2023 -o data/output/my_folder/
 
-# 4) 결과 파일 경로 지정
-python collect.py --stock-codes 005930 --years 2023 --output data/output/samsung_2023.csv
+# 4) 원본 재무제표 JSON도 함께 저장
+python collect.py collect --stock-codes 019440 --years 2023 --save-raw
 
 # 5) 기업 검색 (DART corp_code 조회)
-python collect.py search --name 삼성전자
-python collect.py search --stock-code 005930
+python collect.py search --name 세아특수강
+python collect.py search --stock-code 019440
 """
 
 from __future__ import annotations
@@ -43,18 +43,20 @@ from src.collector import collect_batch
 def cmd_collect(args: argparse.Namespace) -> int:
     """재무비율 데이터 수집."""
     try:
-        output = collect_batch(
+        saved_files = collect_batch(
             stock_codes=args.stock_codes,
             companies_csv=Path(args.companies) if args.companies else None,
             years=args.years,
             quarters=args.quarters,
             fs_div=args.fs_div,
-            output_path=Path(args.output) if args.output else None,
+            output_dir=Path(args.output_dir) if args.output_dir else None,
             api_key=args.api_key,
             delay=args.delay,
             save_raw=args.save_raw,
         )
-        print(f"결과 파일: {output}")
+        print(f"결과 파일 ({len(saved_files)}개):")
+        for f in saved_files:
+            print(f"  {f}")
         return 0
     except (DartApiError, FileNotFoundError, ValueError) as e:
         print(f"오류: {e}", file=sys.stderr)
@@ -127,8 +129,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="CFS=연결재무제표, OFS=별도재무제표 (기본: CFS)"
     )
     collect_p.add_argument(
-        "--output", "-o",
-        help="결과 CSV 파일 경로 (기본: data/output/financial_ratios.csv)"
+        "--output-dir", "-o",
+        help="결과 CSV 저장 디렉터리 (기본: data/output/)"
     )
     collect_p.add_argument(
         "--delay", type=float, default=0.5,
