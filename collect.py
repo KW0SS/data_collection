@@ -18,7 +18,13 @@ python collect.py collect --stock-codes 019440 --years 2023 --save-raw
 # 5) S3에 GICS 섹터별로 원본 데이터 업로드 (기업 목록 CSV에 gics_sector 필요)
 python collect.py collect --companies data/input/companies.csv --years 2023 --upload-s3
 
-# 6) 기업 검색 (DART corp_code 조회)
+# 6) 이미 수집된 데이터는 자동 스킵 (중복 방지)
+python collect.py collect --stock-codes 019440 --years 2022 2023
+
+# 7) 기존 데이터 무시하고 전체 재수집
+python collect.py collect --stock-codes 019440 --years 2023 --force
+
+# 8) 기업 검색 (DART corp_code 조회)
 python collect.py search --name 세아특수강
 python collect.py search --stock-code 019440
 """
@@ -59,6 +65,7 @@ def cmd_collect(args: argparse.Namespace) -> int:
             upload_s3=args.upload_s3,
             s3_bucket=args.s3_bucket,
             s3_region=args.s3_region,
+            force=args.force,
         )
         print(f"결과 파일 ({len(saved_files)}개):")
         for f in saved_files:
@@ -157,6 +164,10 @@ def build_parser() -> argparse.ArgumentParser:
     collect_p.add_argument(
         "--s3-region",
         help="AWS 리전 (없으면 .env의 S3_REGION 또는 ap-northeast-2)"
+    )
+    collect_p.add_argument(
+        "--force", action="store_true",
+        help="중복 체크를 무시하고 전체 재수집 (기존 데이터 덮어쓰기)"
     )
     collect_p.set_defaults(func=cmd_collect)
 

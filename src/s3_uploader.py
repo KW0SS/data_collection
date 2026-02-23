@@ -118,6 +118,19 @@ def _try_create_bucket(client, bucket: str, region: str) -> None:
             raise
 
 
+def _check_s3_exists(client, bucket: str, key: str) -> bool:
+    """S3에 해당 key가 이미 존재하는지 확인.
+
+    Returns:
+        True면 존재, False면 없음.
+    """
+    try:
+        client.head_object(Bucket=bucket, Key=key)
+        return True
+    except Exception:
+        return False
+
+
 def upload_raw_to_s3(
     raw_items: list[dict[str, Any]],
     stock_code: str,
@@ -171,9 +184,11 @@ def upload_batch_to_s3(
     raw_data_list: list[dict[str, Any]],
     bucket: str | None = None,
     region: str | None = None,
+    force: bool = False,
 ) -> list[str]:
     """
     여러 건의 원본 재무제표를 S3에 배치 업로드.
+    이미 S3에 존재하는 파일은 건너뛰고, force=True면 덮어씁니다.
 
     Args:
         raw_data_list: [
@@ -186,6 +201,7 @@ def upload_batch_to_s3(
             },
             ...
         ]
+        force: True면 기존 파일 덮어쓰기
 
     Returns:
         업로드된 S3 key 리스트
@@ -196,15 +212,23 @@ def upload_batch_to_s3(
     config = _get_s3_config(bucket, region)
     client = _get_s3_client(config)
     bucket_name = config["bucket"]
-    bucket_checked = False  # NoSuchBucket 발생 시 한 번만 생성 시도
+    bucket_checked = False
 
     uploaded: list[str] = []
+    skipped = 0
 
     for entry in raw_data_list:
         s3_key = (
             f"{entry['gics_sector']}/"
             f"{entry['stock_code']}_{entry['year']}_{entry['quarter']}.json"
         )
+
+        # ── 중복 체크: S3에 이미 존재하면 스킵 ──
+        if not force and _check_s3_exists(client, bucket_name, s3_key):
+            print(f"  ☁️  s3://{bucket_name}/{s3_key} → ⏭ 이미 존재 (SKIP)", file=sys.stderr)
+            skipped += 1
+            continue
+
         body = json.dumps(
             entry["raw_items"], ensure_ascii=False, indent=2
         ).encode("utf-8")
@@ -218,7 +242,6 @@ def upload_batch_to_s3(
             if not bucket_checked:
                 _try_create_bucket(client, bucket_name, config["region"])
                 bucket_checked = True
-                # 재시도
                 client.put_object(
                     Bucket=bucket_name, Key=s3_key, Body=body,
                     ContentType="application/json; charset=utf-8",
@@ -231,7 +254,8 @@ def upload_batch_to_s3(
         print(f"  ☁️  {s3_uri}", file=sys.stderr)
 
     print(
-        f"\n✅ S3 업로드 완료: {len(uploaded)}개 파일 → s3://{config['bucket']}/",
+        f"\n✅ S3 업로드 완료: {len(uploaded)}개 업로드, {skipped}개 스킵"
+        f" → s3://{config['bucket']}/",
         file=sys.stderr,
     )
     return uploaded
