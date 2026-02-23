@@ -2,6 +2,7 @@
 
 기업 목록(CSV or 직접 입력) + 연도 범위 → 분기별 재무비율 CSV 출력.
 선택적으로 원본 재무제표 JSON을 로컬(data/raw/) 또는 S3에 저장.
+중복 데이터는 자동으로 건너뛰고, 누락 분기만 추가 수집합니다.
 """
 
 from __future__ import annotations
@@ -10,6 +11,7 @@ import csv
 import json
 import sys
 import time
+from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
@@ -52,6 +54,54 @@ def _save_raw_json(
         json.dumps(raw_items, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
+
+
+# ── 중복 체크: 기존 CSV에서 수집 완료된 분기 목록 로드 ────────
+FIELDNAMES = ["stock_code", "corp_name", "year", "quarter", "label"] + RATIO_NAMES
+
+
+def _load_existing_quarters(
+    save_dir: Path,
+    stock_code: str,
+    year: str,
+) -> set[str]:
+    """기존 CSV에서 이미 수집된 분기 목록을 반환.
+
+    Returns:
+        {"Q1", "H1"} 형태의 set. 파일이 없으면 빈 set.
+    """
+    filepath = save_dir / f"{stock_code}_{year}.csv"
+    if not filepath.exists():
+        return set()
+    quarters: set[str] = set()
+    with open(filepath, newline="", encoding="utf-8-sig") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            q = (row.get("quarter") or "").strip()
+            if q:
+                quarters.add(q)
+    return quarters
+
+
+def _load_existing_rows(
+    save_dir: Path,
+    stock_code: str,
+    year: str,
+) -> list[dict[str, Any]]:
+    """기존 CSV 파일의 모든 행을 읽어서 반환.
+
+    Returns:
+        행 리스트. 파일이 없으면 빈 리스트.
+    """
+    filepath = save_dir / f"{stock_code}_{year}.csv"
+    if not filepath.exists():
+        return []
+    rows: list[dict[str, Any]] = []
+    with open(filepath, newline="", encoding="utf-8-sig") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            rows.append(dict(row))
+    return rows
 
 
 # ── CSV 입력 파싱 ─────────────────────────────────────────────
@@ -140,12 +190,14 @@ def collect_batch(
     upload_s3: bool = False,
     s3_bucket: str | None = None,
     s3_region: str | None = None,
+    force: bool = False,
 ) -> list[Path]:
     """
     여러 기업 × 연도 × 분기의 재무비율을 수집하여 CSV 저장.
 
     파일명 규칙: {종목코드}_{연도}.csv  (예: 019440_2023.csv)
     각 기업 × 연도별로 별도의 CSV 파일로 저장됩니다.
+    이미 수집된 (종목코드, 연도, 분기) 조합은 건너뛰고 누락 분기만 추가합니다.
 
     사용 방식 두 가지:
     1) companies_csv 지정 → CSV에서 기업 목록 로드
@@ -165,6 +217,7 @@ def collect_batch(
         upload_s3: 원본 재무제표를 S3에 업로드할지 여부
         s3_bucket: S3 버킷 이름 (없으면 .env에서 읽기)
         s3_region: AWS 리전 (없으면 .env에서 읽기)
+        force: True이면 중복 체크를 무시하고 전체 재수집
 
     Returns:
         저장된 CSV 파일 경로 리스트
@@ -204,11 +257,29 @@ def collect_batch(
                 print(f"  ⚠ 기업코드 확인 실패 ({comp}): {e}", file=sys.stderr)
                 comp["corp_code"] = ""
 
-    # 결과 수집
-    all_rows: list[dict[str, Any]] = []
-    s3_upload_queue: list[dict[str, Any]] = []  # S3 업로드 대기열
+    # ── 저장 디렉터리 결정 ────────────────────────────────────────
+    save_dir = output_dir if output_dir else OUTPUT_DIR
+    save_dir.mkdir(parents=True, exist_ok=True)
+
+    # ── 중복 체크를 위한 기존 데이터 로드 ───────────────────────
+    # existing_quarters[(stock_code, year)] = {"Q1", "H1", ...}
+    existing_quarters: dict[tuple[str, str], set[str]] = {}
+    if not force:
+        for comp in companies:
+            sc = comp.get("stock_code", "")
+            if not sc:
+                continue
+            for yr in years:
+                eq = _load_existing_quarters(save_dir, sc, yr)
+                if eq:
+                    existing_quarters[(sc, yr)] = eq
+
+    # ── 결과 수집 ──────────────────────────────────────────────
+    new_rows: list[dict[str, Any]] = []
+    s3_upload_queue: list[dict[str, Any]] = []
     total = len(companies) * len(years) * len(quarters)
     done = 0
+    skipped = 0
 
     for comp in companies:
         cc = comp.get("corp_code", "")
@@ -223,16 +294,26 @@ def collect_batch(
         for yr in years:
             for q in quarters:
                 done += 1
-                print(f"  [{done}/{total}] {cn or sc} {yr}-{q} ...", file=sys.stderr)
+
+                # ── 중복 체크 ──
+                if not force and q in existing_quarters.get((sc, yr), set()):
+                    print(
+                        f"  [{done}/{total}] {cn or sc} {yr}-{q} ... "
+                        f"⏭ 이미 수집됨 (SKIP)",
+                        file=sys.stderr,
+                    )
+                    skipped += 1
+                    continue
+
+                print(f"  [{done}/{total}] {cn or sc} {yr}-{q} ... 수집 중", file=sys.stderr)
 
                 # CFS 시도 → 실패하면 OFS 폴백
                 row, raw_items = collect_single(key, cc, sc, cn, yr, q, fs_div, save_raw=save_raw)
-                # CFS에서 데이터가 비어 있으면 OFS로 재시도
                 if fs_div == "CFS" and all(row.get(n) is None for n in RATIO_NAMES):
                     row, raw_items = collect_single(key, cc, sc, cn, yr, q, "OFS", save_raw=save_raw)
 
                 row["label"] = comp.get("label", "")
-                all_rows.append(row)
+                new_rows.append(row)
 
                 # S3 업로드 대기열에 추가
                 if upload_s3 and raw_items:
@@ -247,36 +328,58 @@ def collect_batch(
                 if delay > 0:
                     time.sleep(delay)
 
-    # ── CSV 저장: 기업코드_연도.csv 별로 분리 ──────────────────
-    save_dir = output_dir if output_dir else OUTPUT_DIR
-    save_dir.mkdir(parents=True, exist_ok=True)
+    # ── CSV 저장: 기존 데이터 + 신규 데이터 병합 ──────────────
+    # 신규 데이터를 (stock_code, year) 기준으로 그룹핑
+    new_groups: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
+    for row in new_rows:
+        grp_key = (row["stock_code"], row["year"])
+        new_groups[grp_key].append(row)
 
-    # (stock_code, year) 기준으로 그룹핑
-    from collections import defaultdict
-    groups: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
-    for row in all_rows:
-        key = (row["stock_code"], row["year"])
-        groups[key].append(row)
-
-    fieldnames = ["stock_code", "corp_name", "year", "quarter", "label"] + RATIO_NAMES
     saved_files: list[Path] = []
+    quarter_order = list(REPORT_CODES.keys())  # Q1, H1, Q3, ANNUAL
 
-    for (sc, yr), rows in groups.items():
+    # 신규 데이터가 있는 파일만 저장
+    for (sc, yr), rows in new_groups.items():
+        # 기존 CSV 행 로드 (force면 무시)
+        if force:
+            merged = rows
+        else:
+            existing_rows = _load_existing_rows(save_dir, sc, yr)
+            # 기존 분기 + 신규 분기 병합
+            existing_q_set = {r.get("quarter") for r in existing_rows}
+            merged = list(existing_rows)
+            for r in rows:
+                if r["quarter"] not in existing_q_set:
+                    merged.append(r)
+
+        # 분기 순서대로 정렬
+        merged.sort(key=lambda r: quarter_order.index(r.get("quarter", "")) if r.get("quarter", "") in quarter_order else 99)
+
         filename = f"{sc}_{yr}.csv"
         filepath = save_dir / filename
         with open(filepath, "w", newline="", encoding="utf-8-sig") as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
+            writer = csv.DictWriter(f, fieldnames=FIELDNAMES, extrasaction="ignore")
             writer.writeheader()
-            for row in rows:
+            for row in merged:
                 writer.writerow(row)
         saved_files.append(filepath)
-        print(f"  📄 {filepath}  ({len(rows)}행)", file=sys.stderr)
+        print(f"  📄 {filepath}  ({len(merged)}행)", file=sys.stderr)
 
-    print(f"\n✅ CSV 저장 완료: {save_dir}/  (총 {len(saved_files)}개 파일, {len(all_rows)}행)", file=sys.stderr)
+    collected = len(new_rows)
+    print(
+        f"\n✅ 완료: 신규 {collected}건 수집, {skipped}건 스킵"
+        f"  ({len(saved_files)}개 파일 저장)",
+        file=sys.stderr,
+    )
 
     # ── S3 업로드 ─────────────────────────────────────────────
     if upload_s3 and s3_upload_queue:
         print(f"\n☁️  S3 업로드 시작 ({len(s3_upload_queue)}개 파일)...", file=sys.stderr)
-        upload_batch_to_s3(s3_upload_queue, bucket=s3_bucket, region=s3_region)
+        upload_batch_to_s3(
+            s3_upload_queue,
+            bucket=s3_bucket,
+            region=s3_region,
+            force=force,
+        )
 
     return saved_files
