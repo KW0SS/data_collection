@@ -86,21 +86,26 @@ python3 collect.py collect --companies data/input/companies.csv --years 2023 --u
 `data/input/companies.csv` 작성:
 
 ```csv
-stock_code,corp_name,label,gics_sector
-019440,세아특수강,1,Materials
-005930,삼성전자,0,Information Technology
-035720,카카오,0,Communication Services
+stock_code,corp_name,label,gics_sector,start_year,end_year
+019440,세아특수강,1,Materials,2020,2023
+005930,삼성전자,0,Information Technology,2021,2024
+035720,카카오,0,Communication Services,,
 ```
 
-| 컬럼 | 설명 |
-|---|---|
-| `stock_code` | 종목코드 (6자리) |
-| `corp_name` | 기업명 (참고용) |
-| `label` | 0=정상, 1=상폐 (모델 학습용 라벨) |
-| `gics_sector` | GICS 섹터명 (S3 업로드 시 디렉터리 구분에 사용) |
+| 컬럼 | 필수 | 설명 |
+|---|---|---|
+| `stock_code` | ✅ | 종목코드 (6자리) |
+| `corp_name` | ✅ | 기업명 (참고용) |
+| `label` | ✅ | 0=정상, 1=상폐 (모델 학습용 라벨) |
+| `gics_sector` | ⬜ | GICS 섹터명 (S3 업로드 시 디렉터리 구분에 사용) |
+| `start_year` | ⬜ | 수집 시작 연도 (기업별 개별 지정, 없으면 `--years` 사용) |
+| `end_year` | ⬜ | 수집 종료 연도 (`start_year`와 함께 사용) |
+
+> **기업별 연도 범위:** 기업마다 상장 기간이 다르므로, CSV에 `start_year`/`end_year`를 기업별로 지정하면 해당 범위만 수집합니다. 지정하지 않은 기업은 CLI의 `--years` 값을 사용합니다.
 
 ```bash
-python3 collect.py collect --companies data/input/companies.csv --years 2020 2021 2022 2023
+# CSV에 start_year/end_year가 있으면 --years는 미지정 기업에만 적용됨
+python3 collect.py collect --companies data/input/companies.csv --years 2023
 ```
 
 ### 3) 기업 검색 (DART 고유코드 조회)

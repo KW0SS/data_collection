@@ -1,2 +1,2 @@
-stock_code,corp_name,label,gics_sector
-019440,세아특수강,1,Materials
+stock_code,corp_name,label,gics_sector,start_year,end_year
+019440,세아특수강,1,Materials,2012,2025

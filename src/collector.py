@@ -116,6 +116,9 @@ def load_company_list(csv_path: Path) -> list[dict[str, str]]:
 
     Optional:
       corp_code    – DART 고유코드 (있으면 API 변환 생략)
+      gics_sector  – GICS 섹터 영문명 (예: Materials)
+      start_year   – 수집 시작 연도 (예: 2020). --years 대신 기업별 범위 지정
+      end_year     – 수집 종료 연도 (예: 2023). start_year와 함께 사용
     """
     if not csv_path.exists():
         raise FileNotFoundError(f"기업 목록 파일이 없습니다: {csv_path}")
@@ -261,6 +264,15 @@ def collect_batch(
     save_dir = output_dir if output_dir else OUTPUT_DIR
     save_dir.mkdir(parents=True, exist_ok=True)
 
+    # ── 기업별 연도 범위 결정 헬퍼 ────────────────────────────
+    def _resolve_years(comp: dict[str, str]) -> list[str]:
+        """CSV의 start_year/end_year가 있으면 기업별 범위, 없으면 글로벌 years 사용."""
+        sy = comp.get("start_year", "").strip()
+        ey = comp.get("end_year", "").strip()
+        if sy and ey:
+            return [str(y) for y in range(int(sy), int(ey) + 1)]
+        return years  # CLI --years 또는 기본값
+
     # ── 중복 체크를 위한 기존 데이터 로드 ───────────────────────
     # existing_quarters[(stock_code, year)] = {"Q1", "H1", ...}
     existing_quarters: dict[tuple[str, str], set[str]] = {}
@@ -269,7 +281,7 @@ def collect_batch(
             sc = comp.get("stock_code", "")
             if not sc:
                 continue
-            for yr in years:
+            for yr in _resolve_years(comp):
                 eq = _load_existing_quarters(save_dir, sc, yr)
                 if eq:
                     existing_quarters[(sc, yr)] = eq
@@ -277,7 +289,7 @@ def collect_batch(
     # ── 결과 수집 ──────────────────────────────────────────────
     new_rows: list[dict[str, Any]] = []
     s3_upload_queue: list[dict[str, Any]] = []
-    total = len(companies) * len(years) * len(quarters)
+    total = sum(len(_resolve_years(c)) * len(quarters) for c in companies)
     done = 0
     skipped = 0
 
@@ -286,12 +298,13 @@ def collect_batch(
         sc = comp.get("stock_code", "")
         cn = comp.get("corp_name", "")
         gics = comp.get("gics_sector", "Unknown")
+        comp_years = _resolve_years(comp)
         if not cc:
             print(f"  ⏭ 건너뜀 (corp_code 없음): {sc} {cn}", file=sys.stderr)
-            done += len(years) * len(quarters)
+            done += len(comp_years) * len(quarters)
             continue
 
-        for yr in years:
+        for yr in comp_years:
             for q in quarters:
                 done += 1
 

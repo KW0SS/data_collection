@@ -84,16 +84,18 @@ S3 디렉터리명 및 기업 목록 CSV의 `gics_sector` 컬럼에 반드시 �
 ### 사용 예시 — 기업 목록 CSV
 
 ```csv
-stock_code,corp_name,label,gics_sector
-019440,세아특수강,1,Materials
-005930,삼성전자,0,Information Technology
-035720,카카오,0,Communication Services
-003490,대한항공,0,Industrials
-068270,셀트리온,0,Health Care
-105560,KB금융,0,Financials
-017670,SK텔레콤,0,Communication Services
-015760,한국전력,0,Utilities
+stock_code,corp_name,label,gics_sector,start_year,end_year
+019440,세아특수강,1,Materials,2020,2023
+005930,삼성전자,0,Information Technology,2021,2024
+035720,카카오,0,Communication Services,,
+003490,대한항공,0,Industrials,2019,2023
+068270,셀트리온,0,Health Care,,
+105560,KB금융,0,Financials,2020,2022
+017670,SK텔레콤,0,Communication Services,,
+015760,한국전력,0,Utilities,2018,2023
 ```
+
+> `start_year`/`end_year`가 비어있는 기업은 CLI `--years` 값을 사용합니다.
 
 > ⚠️ `gics_sector` 값은 위 표의 **영문 명칭**을 정확히 사용해야 합니다. 오타나 다른 표기를 쓰면 S3에 별도 디렉터리가 생성됩니다.
 
