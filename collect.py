@@ -6,7 +6,7 @@
 # 1) 종목코드 직접 입력 → 019440_2022.csv, 019440_2023.csv 생성
 python collect.py collect --stock-codes 019440 --years 2022 2023
 
-# 2) 기업 목록 CSV로 배치 수집
+# 2) 기업 목록 CSV로 배치 수집 (CSV에 start_year/end_year가 있으면 --years 무시)
 python collect.py collect --companies data/input/companies.csv --years 2021 2022 2023
 
 # 3) 저장 디렉터리 지정
@@ -52,9 +52,14 @@ from src.collector import collect_batch
 def cmd_collect(args: argparse.Namespace) -> int:
     """재무비율 데이터 수집."""
     try:
+        # --stock-codes가 지정되면 CSV 무시 (직접 입력 우선)
+        companies_csv = None
+        if not args.stock_codes and args.companies:
+            companies_csv = Path(args.companies)
+
         saved_files = collect_batch(
             stock_codes=args.stock_codes,
-            companies_csv=Path(args.companies) if args.companies else None,
+            companies_csv=companies_csv,
             years=args.years,
             quarters=args.quarters,
             fs_div=args.fs_div,
@@ -126,7 +131,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     collect_p.add_argument(
         "--companies",
-        help="기업 목록 CSV 파일 경로 (예: data/input/companies.csv)"
+        default="data/input/companies_template.csv",
+        help="기업 목록 CSV 파일 경로 (기본: data/input/companies_template.csv)"
     )
     collect_p.add_argument(
         "--years", nargs="+", default=["2023"],
