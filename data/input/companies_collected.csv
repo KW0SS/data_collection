@@ -1,6 +1,13 @@
-stock_code,corp_name,label,gics_sector,start_year,end_year
+﻿stock_code,corp_name,label,gics_sector,start_year,end_year
 052670,제일바이오,1,Health Care,2010,2026
 208340,파멥신,1,Health Care,2018,2026
 150840,인트로메딕,1,Health Care,2013,2026
 057880,푸른소나무,1,Health Care,2011,2025
 024810,이화전기,1,Industrials,2011,2025
+044060,조광ILI,1,Industrials,2011,2025
+290380,대유,1,Materials,2018,2025
+226440,한송네오텍,1,Industrials,2015,2025
+072520,제넨바이오,1,Health Care,2011,2025
+029960,코엔텍,1,Industrials,2011,2025
+268600,셀리버리,1,Health Care,2018,2025
+080000,에스엔유,1,Information Technology,2011,2025
