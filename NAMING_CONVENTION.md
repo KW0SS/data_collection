@@ -119,8 +119,20 @@ stock_code,corp_name,label,gics_sector,start_year,end_year
 **형식:** 역할을 나타내는 **snake_case** 이름
 
 ```
-companies_template.csv      ← 기업 목록 템플릿
-companies.csv               ← 실제 기업 목록 (사용자 작성)
+data/input/
+├── companies_template.csv      ← 수집 대기열 (실행 후 비우고 재사용)
+└── companies_collected.csv     ← 수집 완료 기록 (자동 누적)
+```
+
+| 파일 | 역할 | 관리 방식 |
+|---|---|---|
+| `companies_template.csv` | 수집할 기업 목록 (큐) | 사용자가 직접 작성·비움 |
+| `companies_collected.csv` | 수집 완료 기업 기록 (로그) | 수집 후 자동 append |
+
+두 파일의 컬럼 형식은 동일합니다:
+
+```csv
+stock_code,corp_name,label,gics_sector,start_year,end_year
 ```
 
 ---

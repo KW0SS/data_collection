@@ -31,6 +31,66 @@ DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 OUTPUT_DIR = DATA_DIR / "output"
 INPUT_DIR = DATA_DIR / "input"
 RAW_DIR = DATA_DIR / "raw"
+COLLECTED_CSV = INPUT_DIR / "companies_collected.csv"
+
+# ── 수집 완료 기업 기록 ───────────────────────────────────────
+COLLECTED_FIELDNAMES = [
+    "stock_code", "corp_name", "label", "gics_sector", "start_year", "end_year",
+]
+
+
+def _record_collected_companies(
+    companies: list[dict[str, str]],
+    collected_stock_codes: set[str],
+) -> None:
+    """수집이 완료된 기업 정보를 companies_collected.csv에 누적 기록.
+
+    이미 기록된 종목코드는 중복 추가하지 않습니다.
+    """
+    if not collected_stock_codes:
+        return
+
+    # 기존 파일에서 이미 기록된 종목코드 로드
+    existing_codes: set[str] = set()
+    existing_rows: list[dict[str, str]] = []
+    if COLLECTED_CSV.exists():
+        with open(COLLECTED_CSV, newline="", encoding="utf-8-sig") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                sc = (row.get("stock_code") or "").strip()
+                existing_codes.add(sc)
+                existing_rows.append(row)
+
+    # 새로 기록할 기업만 필터
+    new_entries: list[dict[str, str]] = []
+    for comp in companies:
+        sc = comp.get("stock_code", "").strip()
+        if sc in collected_stock_codes and sc not in existing_codes:
+            new_entries.append({
+                "stock_code": sc,
+                "corp_name": comp.get("corp_name", ""),
+                "label": comp.get("label", ""),
+                "gics_sector": comp.get("gics_sector", "Unknown"),
+                "start_year": comp.get("start_year", ""),
+                "end_year": comp.get("end_year", ""),
+            })
+
+    if not new_entries:
+        return
+
+    # 기존 + 신규 합쳐서 전체 다시 쓰기
+    all_rows = existing_rows + new_entries
+    with open(COLLECTED_CSV, "w", newline="", encoding="utf-8-sig") as f:
+        writer = csv.DictWriter(f, fieldnames=COLLECTED_FIELDNAMES, extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows(all_rows)
+
+    for entry in new_entries:
+        print(
+            f"  📋 수집 기록: {entry['corp_name'] or entry['stock_code']} "
+            f"→ {COLLECTED_CSV.name}",
+            file=sys.stderr,
+        )
 
 
 def _ensure_dirs(save_raw: bool = False) -> None:
@@ -406,5 +466,11 @@ def collect_batch(
             region=s3_region,
             force=force,
         )
+
+    # ── 수집 완료 기업 기록 ───────────────────────────────────
+    if saved_files and companies_csv:
+        # CSV 저장이 실제로 이루어진 종목코드만 기록
+        collected_codes = {row["stock_code"] for row in new_rows}
+        _record_collected_companies(companies, collected_codes)
 
     return saved_files

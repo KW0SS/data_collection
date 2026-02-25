@@ -17,9 +17,10 @@ data_collection/
 │   ├── collector.py                # 데이터 수집 오케스트레이터
 │   └── s3_uploader.py              # S3 업로드 모듈 (GICS 섹터별)
 ├── data/
-│   ├── input/                      # 기업 목록 CSV (사용자 작성)
-│   │   └── companies_template.csv
-│   ├── output/                     # 결과 재무비율 CSV
+│   ├── input/                      # 기업 목록 CSV
+│   │   ├── companies_template.csv  # 수집 대기열 (실행 후 비우고 재사용)
+│   │   └── companies_collected.csv # 수집 완료 기록 (자동 누적)
+│   ├── output/                     # 결과 재무비율 CSV (GICS 섹터별)
 │   └── raw/                        # 원본 재무제표 JSON (선택)
 ├── requirements.txt
 └── .env                            # API 키 및 S3 설정
