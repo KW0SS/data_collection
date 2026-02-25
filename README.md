@@ -79,7 +79,7 @@ python3 collect.py collect --companies data/input/companies.csv --years 2023 --u
 python3 collect.py collect --companies data/input/companies.csv --years 2023 --upload-s3 --s3-bucket my-bucket
 ```
 
-**파일명 규칙:** `{종목코드}_{연도}.csv` (예: `019440_2023.csv`)
+**파일명 규칙:** `{GICS섹터}/{종목코드}_{연도}.csv` (예: `Materials/019440_2023.csv`)
 
 ### 2) 기업 목록 CSV로 배치 수집
 
@@ -143,13 +143,21 @@ collect.py search
 
 ```
 data/output/
-├── 019440_2020.csv    # 세아특수강 2020년 (Q1, H1, Q3, ANNUAL)
-├── 019440_2021.csv    # 세아특수강 2021년
-├── 019440_2022.csv    # 세아특수강 2022년
-├── 019440_2023.csv    # 세아특수강 2023년
-├── 005930_2020.csv    # 삼성전자 2020년
+├── Health Care/
+│   ├── 052670_2010.csv     # 제일바이오 2010년 (Q1, H1, Q3, ANNUAL)
+│   ├── 052670_2024.csv     # 제일바이오 2024년
+│   └── 150840_2021.csv     # 인트로메딕 2021년
+├── Materials/
+│   ├── 019440_2022.csv     # 세아특수강 2022년
+│   └── 019440_2023.csv     # 세아특수강 2023년
+├── Information Technology/
+│   └── 054630_2023.csv     # 에이디칩스 2023년
+├── Industrials/
+│   └── 024810_2023.csv     # 이화전기 2023년
 └── ...
 ```
+
+> ⚠️ `gics_sector`가 지정되지 않은 기업은 `Unknown/` 디렉터리에 저장됩니다.
 
 ---
 

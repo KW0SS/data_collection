@@ -60,17 +60,23 @@ def _save_raw_json(
 FIELDNAMES = ["stock_code", "corp_name", "year", "quarter", "label"] + RATIO_NAMES
 
 
+def _sector_dir(save_dir: Path, gics_sector: str) -> Path:
+    """GICS 섹터 서브디렉터리 경로를 반환."""
+    return save_dir / (gics_sector or "Unknown")
+
+
 def _load_existing_quarters(
     save_dir: Path,
     stock_code: str,
     year: str,
+    gics_sector: str = "Unknown",
 ) -> set[str]:
     """기존 CSV에서 이미 수집된 분기 목록을 반환.
 
     Returns:
         {"Q1", "H1"} 형태의 set. 파일이 없으면 빈 set.
     """
-    filepath = save_dir / f"{stock_code}_{year}.csv"
+    filepath = _sector_dir(save_dir, gics_sector) / f"{stock_code}_{year}.csv"
     if not filepath.exists():
         return set()
     quarters: set[str] = set()
@@ -87,13 +93,14 @@ def _load_existing_rows(
     save_dir: Path,
     stock_code: str,
     year: str,
+    gics_sector: str = "Unknown",
 ) -> list[dict[str, Any]]:
     """기존 CSV 파일의 모든 행을 읽어서 반환.
 
     Returns:
         행 리스트. 파일이 없으면 빈 리스트.
     """
-    filepath = save_dir / f"{stock_code}_{year}.csv"
+    filepath = _sector_dir(save_dir, gics_sector) / f"{stock_code}_{year}.csv"
     if not filepath.exists():
         return []
     rows: list[dict[str, Any]] = []
@@ -279,10 +286,11 @@ def collect_batch(
     if not force:
         for comp in companies:
             sc = comp.get("stock_code", "")
+            gics = comp.get("gics_sector", "Unknown")
             if not sc:
                 continue
             for yr in _resolve_years(comp):
-                eq = _load_existing_quarters(save_dir, sc, yr)
+                eq = _load_existing_quarters(save_dir, sc, yr, gics)
                 if eq:
                     existing_quarters[(sc, yr)] = eq
 
@@ -326,6 +334,7 @@ def collect_batch(
                     row, raw_items = collect_single(key, cc, sc, cn, yr, q, "OFS", save_raw=save_raw)
 
                 row["label"] = comp.get("label", "")
+                row["gics_sector"] = gics  # 섹터별 디렉터리 저장용
                 new_rows.append(row)
 
                 # S3 업로드 대기열에 추가
@@ -342,22 +351,25 @@ def collect_batch(
                     time.sleep(delay)
 
     # ── CSV 저장: 기존 데이터 + 신규 데이터 병합 ──────────────
-    # 신규 데이터를 (stock_code, year) 기준으로 그룹핑
-    new_groups: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
+    # 신규 데이터를 (stock_code, year, gics_sector) 기준으로 그룹핑
+    new_groups: dict[tuple[str, str, str], list[dict[str, Any]]] = defaultdict(list)
     for row in new_rows:
-        grp_key = (row["stock_code"], row["year"])
+        grp_key = (row["stock_code"], row["year"], row.get("gics_sector", "Unknown"))
         new_groups[grp_key].append(row)
 
     saved_files: list[Path] = []
     quarter_order = list(REPORT_CODES.keys())  # Q1, H1, Q3, ANNUAL
 
-    # 신규 데이터가 있는 파일만 저장
-    for (sc, yr), rows in new_groups.items():
+    # 신규 데이터가 있는 파일만 저장 (섹터별 서브디렉터리)
+    for (sc, yr, gics), rows in new_groups.items():
+        sector_path = _sector_dir(save_dir, gics)
+        sector_path.mkdir(parents=True, exist_ok=True)
+
         # 기존 CSV 행 로드 (force면 무시)
         if force:
             merged = rows
         else:
-            existing_rows = _load_existing_rows(save_dir, sc, yr)
+            existing_rows = _load_existing_rows(save_dir, sc, yr, gics)
             # 기존 분기 + 신규 분기 병합
             existing_q_set = {r.get("quarter") for r in existing_rows}
             merged = list(existing_rows)
@@ -369,7 +381,7 @@ def collect_batch(
         merged.sort(key=lambda r: quarter_order.index(r.get("quarter", "")) if r.get("quarter", "") in quarter_order else 99)
 
         filename = f"{sc}_{yr}.csv"
-        filepath = save_dir / filename
+        filepath = sector_path / filename
         with open(filepath, "w", newline="", encoding="utf-8-sig") as f:
             writer = csv.DictWriter(f, fieldnames=FIELDNAMES, extrasaction="ignore")
             writer.writeheader()
