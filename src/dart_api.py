@@ -77,8 +77,11 @@ def _http_get(url: str, params: dict[str, str], timeout: int = 30) -> bytes:
         context = ssl.create_default_context(cafile=certifi.where())
     except Exception:
         context = None
-    with urllib.request.urlopen(req, timeout=timeout, context=context) as resp:
-        return resp.read()
+    try:
+        with urllib.request.urlopen(req, timeout=timeout, context=context) as resp:
+            return resp.read()
+    except urllib.error.URLError as e:
+        raise DartApiError(f"네트워크 오류: {e}") from e
 
 
 # ── 기업 코드 관련 ────────────────────────────────────────────
