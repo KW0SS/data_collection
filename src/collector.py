@@ -437,6 +437,16 @@ def collect_batch(
                 if r["quarter"] not in existing_q_set:
                     merged.append(r)
 
+        # 모든 행의 재무비율 값이 전부 비어있으면 파일 생성 건너뛰기
+        has_any_value = any(
+            row.get(name) is not None and row.get(name) != ""
+            for row in merged
+            for name in RATIO_NAMES
+        )
+        if not has_any_value:
+            print(f"  ⏭ {sc}_{yr}.csv 건너뜀 (데이터 없음)", file=sys.stderr)
+            continue
+
         # 분기 순서대로 정렬
         merged.sort(key=lambda r: quarter_order.index(r.get("quarter", "")) if r.get("quarter", "") in quarter_order else 99)
 
