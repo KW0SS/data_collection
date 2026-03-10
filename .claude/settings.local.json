@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(done)",
+      "Bash(python3:*)",
+      "WebSearch",
+      "Bash(pip show dart-fss)",
+      "Bash(pip install dart-fss)",
+      "Bash(pip3 install dart-fss)",
+      "Bash(pip3 install --upgrade pyparsing)"
+    ]
+  }
+}
