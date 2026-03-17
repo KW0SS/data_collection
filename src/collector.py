@@ -23,6 +23,7 @@ from .dart_api import (
     resolve_corp_code,
 )
 from .account_mapper import extract_standard_items
+from .dart_legacy_fetcher import fetch_legacy_financial_statements
 from .ratio_calculator import RATIO_NAMES, compute_all_ratios
 from .s3_uploader import upload_batch_to_s3
 
@@ -198,6 +199,10 @@ def load_company_list(csv_path: Path) -> list[dict[str, str]]:
     return rows
 
 
+# ── 2015년 이전 데이터 수집 기준 연도 ────────────────────────
+LEGACY_CUTOFF_YEAR = 2015
+
+
 # ── 단일 기업·단일 보고서 처리 ────────────────────────────────
 def collect_single(
     api_key: str,
@@ -240,6 +245,50 @@ def collect_single(
         "corp_name": corp_name,
         "year": year,
         "quarter": quarter,
+    }
+    row.update(ratios)
+    return row, raw_items
+
+
+def collect_single_legacy(
+    api_key: str,
+    corp_code: str,
+    stock_code: str,
+    corp_name: str,
+    year: str,
+    fs_div: str = "CFS",
+    save_raw: bool = False,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """dart-fss를 사용하여 2015년 이전 재무비율을 수집.
+
+    dart-fss는 사업보고서(ANNUAL) 단위로 추출하므로 분기 구분 없이
+    ANNUAL로 고정하여 수집합니다.
+
+    Returns:
+        (ratio_row, raw_items) 튜플.
+    """
+    try:
+        raw_items = fetch_legacy_financial_statements(
+            api_key, corp_code, year, fs_div
+        )
+    except DartApiError as e:
+        print(f"  ⚠ dart-fss 오류 ({corp_name} {year}): {e}", file=sys.stderr)
+        raw_items = []
+
+    if raw_items and save_raw:
+        _save_raw_json(raw_items, stock_code, year, "ANNUAL", fs_div)
+
+    if not raw_items:
+        ratios = {name: None for name in RATIO_NAMES}
+    else:
+        std_items = extract_standard_items(raw_items)
+        ratios = compute_all_ratios(std_items)
+
+    row: dict[str, Any] = {
+        "stock_code": stock_code,
+        "corp_name": corp_name,
+        "year": year,
+        "quarter": "ANNUAL",
     }
     row.update(ratios)
     return row, raw_items
@@ -373,6 +422,54 @@ def collect_batch(
             continue
 
         for yr in comp_years:
+            is_legacy = int(yr) < LEGACY_CUTOFF_YEAR
+
+            if is_legacy:
+                # 2015년 이전: dart-fss로 사업보고서(ANNUAL) 단위 수집
+                done += len(quarters)  # legacy는 분기 루프 대신 연도 단위
+
+                # ── 중복 체크 ──
+                if not force and "ANNUAL" in existing_quarters.get((sc, yr), set()):
+                    print(
+                        f"  [{done}/{total}] {cn or sc} {yr}-ANNUAL ... "
+                        f"⏭ 이미 수집됨 (SKIP)",
+                        file=sys.stderr,
+                    )
+                    skipped += len(quarters)
+                    continue
+
+                print(
+                    f"  [{done}/{total}] {cn or sc} {yr}-ANNUAL ... "
+                    f"수집 중 (dart-fss)",
+                    file=sys.stderr,
+                )
+
+                # CFS 시도 → 실패하면 OFS 폴백
+                row, raw_items = collect_single_legacy(
+                    key, cc, sc, cn, yr, fs_div, save_raw=save_raw,
+                )
+                if fs_div == "CFS" and all(row.get(n) is None for n in RATIO_NAMES):
+                    row, raw_items = collect_single_legacy(
+                        key, cc, sc, cn, yr, "OFS", save_raw=save_raw,
+                    )
+
+                row["label"] = comp.get("label", "")
+                row["gics_sector"] = gics
+                new_rows.append(row)
+
+                if upload_s3 and raw_items:
+                    s3_upload_queue.append({
+                        "raw_items": raw_items,
+                        "stock_code": sc,
+                        "year": yr,
+                        "quarter": "ANNUAL",
+                        "gics_sector": gics,
+                    })
+
+                if delay > 0:
+                    time.sleep(delay)
+                continue
+
             for q in quarters:
                 done += 1
 
@@ -437,6 +534,16 @@ def collect_batch(
                 if r["quarter"] not in existing_q_set:
                     merged.append(r)
 
+        # 모든 행의 재무비율 값이 전부 비어있으면 파일 생성 건너뛰기
+        has_any_value = any(
+            row.get(name) is not None and row.get(name) != ""
+            for row in merged
+            for name in RATIO_NAMES
+        )
+        if not has_any_value:
+            print(f"  ⏭ {sc}_{yr}.csv 건너뜀 (데이터 없음)", file=sys.stderr)
+            continue
+
         # 분기 순서대로 정렬
         merged.sort(key=lambda r: quarter_order.index(r.get("quarter", "")) if r.get("quarter", "") in quarter_order else 99)
 
@@ -474,3 +581,103 @@ def collect_batch(
         _record_collected_companies(companies, collected_codes)
 
     return saved_files
+
+
+# ── 2015년 이전 누락 기업 목록 생성 ────────────────────────────
+MISSING_LEGACY_CSV = INPUT_DIR / "companies_missing_legacy.csv"
+
+
+def generate_missing_legacy_csv(
+    output_dir: Path | None = None,
+) -> Path:
+    """companies_collected.csv와 output 디렉터리를 비교하여
+    2015년 이전 누락 연도가 있는 기업만 추출한 CSV를 생성.
+
+    생성 파일: data/input/companies_missing_legacy.csv
+    컬럼: stock_code, corp_name, label, gics_sector, start_year, end_year
+
+    start_year/end_year는 누락 구간의 시작/종료 연도로 설정됩니다.
+    (2015년 이전만 대상)
+
+    Returns:
+        생성된 CSV 파일 경로
+    """
+    if not COLLECTED_CSV.exists():
+        raise FileNotFoundError(
+            f"{COLLECTED_CSV}가 없습니다. 먼저 collect 명령으로 데이터를 수집하세요."
+        )
+
+    save_dir = output_dir if output_dir else OUTPUT_DIR
+
+    # collected CSV 로드
+    companies: list[dict[str, str]] = []
+    with open(COLLECTED_CSV, newline="", encoding="utf-8-sig") as f:
+        for row in csv.DictReader(f):
+            companies.append({k.strip(): (v or "").strip() for k, v in row.items()})
+
+    # output 디렉터리에서 실제 존재하는 파일 스캔
+    actual_files: dict[str, set[int]] = {}
+    for csv_file in save_dir.rglob("*.csv"):
+        parts = csv_file.stem.split("_")
+        if len(parts) == 2:
+            sc, yr = parts
+            try:
+                actual_files.setdefault(sc, set()).add(int(yr))
+            except ValueError:
+                continue
+
+    # 누락 기업 추출 (2015년 이전만)
+    missing_entries: list[dict[str, str]] = []
+    for comp in companies:
+        sc = comp.get("stock_code", "").strip()
+        sy = comp.get("start_year", "").strip()
+        ey = comp.get("end_year", "").strip()
+        if not sc or not sy or not ey:
+            continue
+
+        start = int(sy)
+        end = min(int(ey), LEGACY_CUTOFF_YEAR - 1)  # 2014년까지만
+        if start > end:
+            continue
+
+        expected = set(range(start, end + 1))
+        actual = actual_files.get(sc, set())
+        missing_years = sorted(expected - actual)
+
+        if not missing_years:
+            continue
+
+        missing_entries.append({
+            "stock_code": sc,
+            "corp_name": comp.get("corp_name", ""),
+            "label": comp.get("label", ""),
+            "gics_sector": comp.get("gics_sector", "Unknown"),
+            "start_year": str(missing_years[0]),
+            "end_year": str(missing_years[-1]),
+        })
+
+    # CSV 저장
+    INPUT_DIR.mkdir(parents=True, exist_ok=True)
+    with open(MISSING_LEGACY_CSV, "w", newline="", encoding="utf-8-sig") as f:
+        writer = csv.DictWriter(f, fieldnames=COLLECTED_FIELDNAMES)
+        writer.writeheader()
+        writer.writerows(missing_entries)
+
+    total_years = sum(
+        int(e["end_year"]) - int(e["start_year"]) + 1 for e in missing_entries
+    )
+    print(
+        f"📋 누락 기업 목록 생성: {MISSING_LEGACY_CSV}\n"
+        f"   {len(missing_entries)}개 기업, 총 {total_years}개 연도",
+        file=sys.stderr,
+    )
+
+    # 상세 출력
+    for entry in missing_entries:
+        print(
+            f"  {entry['stock_code']} {entry['corp_name']:<14} "
+            f"{entry['gics_sector']:<25} {entry['start_year']}-{entry['end_year']}",
+            file=sys.stderr,
+        )
+
+    return MISSING_LEGACY_CSV

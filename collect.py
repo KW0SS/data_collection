@@ -46,7 +46,7 @@ from src.dart_api import (
     get_api_key,
     CORP_XML_PATH,
 )
-from src.collector import collect_batch
+from src.collector import collect_batch, generate_missing_legacy_csv, MISSING_LEGACY_CSV
 
 
 def cmd_collect(args: argparse.Namespace) -> int:
@@ -109,6 +109,54 @@ def cmd_search(args: argparse.Namespace) -> int:
             )
         return 0
     except DartApiError as e:
+        print(f"오류: {e}", file=sys.stderr)
+        return 1
+
+
+def cmd_check_missing(args: argparse.Namespace) -> int:
+    """2015년 이전 누락 기업 목록 CSV 생성."""
+    try:
+        output_dir = Path(args.output_dir) if args.output_dir else None
+        csv_path = generate_missing_legacy_csv(output_dir=output_dir)
+        print(f"\n생성 완료: {csv_path}")
+        return 0
+    except (FileNotFoundError, ValueError) as e:
+        print(f"오류: {e}", file=sys.stderr)
+        return 1
+
+
+def cmd_collect_legacy(args: argparse.Namespace) -> int:
+    """누락된 2015년 이전 데이터 수집.
+
+    1) --check 옵션이면 누락 목록 CSV를 먼저 생성
+    2) 해당 CSV를 기반으로 collect_batch 실행
+    """
+    try:
+        missing_csv = Path(args.missing_csv) if args.missing_csv else MISSING_LEGACY_CSV
+
+        # --check: 누락 목록 갱신 후 수집
+        if args.check or not missing_csv.exists():
+            output_dir = Path(args.output_dir) if args.output_dir else None
+            missing_csv = generate_missing_legacy_csv(output_dir=output_dir)
+            print("", file=sys.stderr)
+
+        saved_files = collect_batch(
+            companies_csv=missing_csv,
+            fs_div=args.fs_div,
+            output_dir=Path(args.output_dir) if args.output_dir else None,
+            api_key=args.api_key,
+            delay=args.delay,
+            save_raw=args.save_raw,
+            upload_s3=args.upload_s3,
+            s3_bucket=args.s3_bucket,
+            s3_region=args.s3_region,
+            force=args.force,
+        )
+        print(f"결과 파일 ({len(saved_files)}개):")
+        for f in saved_files:
+            print(f"  {f}")
+        return 0
+    except (DartApiError, FileNotFoundError, ValueError) as e:
         print(f"오류: {e}", file=sys.stderr)
         return 1
 
@@ -184,6 +232,58 @@ def build_parser() -> argparse.ArgumentParser:
     search_p.add_argument("--refresh", action="store_true", help="기업코드 XML 새로 다운로드")
     search_p.add_argument("--limit", type=int, default=20, help="최대 검색 결과 수")
     search_p.set_defaults(func=cmd_search)
+
+    # ── check-missing ──
+    check_p = sub.add_parser(
+        "check-missing",
+        help="2015년 이전 누락 기업 목록 CSV 생성",
+    )
+    check_p.add_argument(
+        "--output-dir", "-o",
+        help="output 디렉터리 경로 (기본: data/output/)",
+    )
+    check_p.set_defaults(func=cmd_check_missing)
+
+    # ── collect-legacy ──
+    legacy_p = sub.add_parser(
+        "collect-legacy",
+        help="2015년 이전 누락 데이터 수집 (dart-fss)",
+    )
+    legacy_p.add_argument(
+        "--missing-csv",
+        help="누락 기업 목록 CSV 경로 (기본: data/input/companies_missing_legacy.csv)",
+    )
+    legacy_p.add_argument(
+        "--check", action="store_true",
+        help="수집 전 누락 목록 CSV를 새로 생성",
+    )
+    legacy_p.add_argument(
+        "--fs-div", default="CFS", choices=["CFS", "OFS"],
+        help="CFS=연결재무제표, OFS=별도재무제표 (기본: CFS)",
+    )
+    legacy_p.add_argument(
+        "--output-dir", "-o",
+        help="결과 CSV 저장 디렉터리 (기본: data/output/)",
+    )
+    legacy_p.add_argument(
+        "--delay", type=float, default=0.5,
+        help="API 호출 간 대기(초) (기본: 0.5)",
+    )
+    legacy_p.add_argument(
+        "--save-raw", action="store_true",
+        help="원본 재무제표 JSON을 data/raw/에 저장",
+    )
+    legacy_p.add_argument(
+        "--upload-s3", action="store_true",
+        help="원본 재무제표 JSON을 S3에 업로드",
+    )
+    legacy_p.add_argument("--s3-bucket", help="S3 버킷 이름")
+    legacy_p.add_argument("--s3-region", help="AWS 리전")
+    legacy_p.add_argument(
+        "--force", action="store_true",
+        help="중복 체크를 무시하고 전체 재수집",
+    )
+    legacy_p.set_defaults(func=cmd_collect_legacy)
 
     return parser
 
