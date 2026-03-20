@@ -1,0 +1,32 @@
+{
+  "run_id": "test-20260320-164135",
+  "member": "test",
+  "started_at": "2026-03-20T16:41:35.805569+09:00",
+  "finished_at": "2026-03-20T16:41:36.033190+09:00",
+  "input": {
+    "gics_sector": "Health Care",
+    "tickers": ["052670"],
+    "years": [2025],
+    "quarters": ["Q1"]
+  },
+  "summary": {
+    "total": 1,
+    "success": 1,
+    "skipped": 0,
+    "failed": 0
+  },
+  "results": [
+    {
+      "ticker": "052670",
+      "company_name": "제일바이오",
+      "year": 2025,
+      "quarter": "Q1",
+      "status": "SUCCESS",
+      "s3_data_path": "s3://kw0ss-raw-data-s3/delisted/Health Care/052670_2025_Q1.json",
+      "record_count": 1,
+      "error_code": null,
+      "error_message": null
+    }
+  ],
+  "note": "env bucket test"
+}

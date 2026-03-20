@@ -22,8 +22,12 @@ from __future__ import annotations
 import json
 import os
 import sys
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any
+
+# ── KST 타임존 ────────────────────────────────────────────────
+KST = timezone(timedelta(hours=9))
 
 
 def _load_env() -> dict[str, str]:
@@ -259,3 +263,98 @@ def upload_batch_to_s3(
         file=sys.stderr,
     )
     return uploaded
+
+
+# ── 로그 유틸 ──────────────────────────────────────────────────
+def _now_kst() -> datetime:
+    """현재 시각을 KST로 반환."""
+    return datetime.now(KST)
+
+
+def build_run_log(
+    member: str,
+    run_id: str,
+    started_at: datetime,
+    finished_at: datetime,
+    gics_sector: str,
+    results: list[dict[str, Any]],
+    tickers: list[str],
+    years: list[int],
+    quarters: list[str],
+    note: str = "",
+) -> dict[str, Any]:
+    """업로드 실행 로그를 표준 dict로 구성."""
+    success = sum(1 for r in results if r.get("status") == "SUCCESS")
+    skipped = sum(1 for r in results if r.get("status") == "SKIPPED")
+    failed = sum(1 for r in results if r.get("status") == "FAILED")
+
+    return {
+        "run_id": run_id,
+        "member": member,
+        "started_at": started_at.isoformat(),
+        "finished_at": finished_at.isoformat(),
+        "input": {
+            "gics_sector": gics_sector,
+            "tickers": tickers,
+            "years": years,
+            "quarters": quarters,
+        },
+        "summary": {
+            "total": len(results),
+            "success": success,
+            "skipped": skipped,
+            "failed": failed,
+        },
+        "results": results,
+        "note": note,
+    }
+
+
+def upload_run_log(
+    log: dict[str, Any],
+    started_at: datetime,
+    bucket: str | None = None,
+    region: str | None = None,
+) -> str | None:
+    """로그 JSON을 S3 log/ 디렉터리에 업로드.
+
+    Returns:
+        업로드된 S3 URI, 실패 시 None.
+    """
+    try:
+        config = _get_s3_config(bucket, region)
+        client = _get_s3_client(config)
+    except Exception as e:
+        print(f"  ⚠️  S3 로그 업로드 실패 (설정 오류): {e}", file=sys.stderr)
+        return None
+
+    timestamp = started_at.strftime("%Y%m%d_%H%M%S")
+    member = log.get("member", "unknown")
+    s3_key = f"log/{timestamp}_{member}.json"
+    body = json.dumps(log, ensure_ascii=False, indent=2).encode("utf-8")
+
+    try:
+        client.put_object(
+            Bucket=config["bucket"],
+            Key=s3_key,
+            Body=body,
+            ContentType="application/json; charset=utf-8",
+        )
+    except client.exceptions.NoSuchBucket:
+        try:
+            _try_create_bucket(client, config["bucket"], config["region"])
+            client.put_object(
+                Bucket=config["bucket"],
+                Key=s3_key,
+                Body=body,
+                ContentType="application/json; charset=utf-8",
+            )
+        except Exception as e:
+            print(f"  ⚠️  S3 로그 업로드 실패 (버킷 생성/재시도): {e}", file=sys.stderr)
+            return None
+    except Exception as e:
+        print(f"  ⚠️  S3 로그 업로드 실패: {e}", file=sys.stderr)
+        return None
+
+    uri = f"s3://{config['bucket']}/{s3_key}"
+    return uri

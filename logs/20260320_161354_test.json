@@ -1,0 +1,32 @@
+{
+  "run_id": "test-20260320-161354",
+  "member": "test",
+  "started_at": "2026-03-20T16:13:54.652432+09:00",
+  "finished_at": "2026-03-20T16:13:54.946184+09:00",
+  "input": {
+    "gics_sector": "Materials",
+    "tickers": ["999999"],
+    "years": [2025],
+    "quarters": ["Q1"]
+  },
+  "summary": {
+    "total": 1,
+    "success": 1,
+    "skipped": 0,
+    "failed": 0
+  },
+  "results": [
+    {
+      "ticker": "999999",
+      "company_name": "테스트기업",
+      "year": 2025,
+      "quarter": "Q1",
+      "status": "SUCCESS",
+      "s3_data_path": "s3://kw0ss-raw-data-s3/delisted/Materials/999999_2025_Q1.json",
+      "record_count": 1,
+      "error_code": null,
+      "error_message": null
+    }
+  ],
+  "note": "single-file upload test"
+}
