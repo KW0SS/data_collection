@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm logs/20260320_15550*_test.json logs/20260320_1608*_test.json)",
+      "Bash(rm -rf /tmp/s3_test)"
+    ]
+  }
+}
