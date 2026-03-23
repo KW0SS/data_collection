@@ -5,6 +5,7 @@ import argparse
 import csv
 import io
 import json
+import os
 import re
 import subprocess
 import sys
@@ -404,18 +405,312 @@ def _build_body_file_path(
     return folder / f"{issue_number}_{work_label}.md"
 
 
-def _summarize_major_tasks(pr_type: str, diff_entries: list[DiffEntry]) -> list[str]:
+# ── AI Agent 요약 ──────────────────────────────────────────────
+def _get_openai_key() -> str | None:
+    """OPENAI_API_KEY를 환경변수 또는 .env에서 가져옴."""
+    key = os.getenv("OPENAI_API_KEY")
+    if key:
+        return key
+    env_path = Path(__file__).resolve().parent.parent / ".env"
+    if env_path.exists():
+        for line in env_path.read_text().splitlines():
+            line = line.strip()
+            if line.startswith("OPENAI_API_KEY="):
+                return line.split("=", 1)[1].strip().strip('"').strip("'")
+    return None
+
+
+def _get_diff_text(base: str, head_ref: str, max_chars: int = 80000) -> str:
+    """base...head_ref 사이의 diff 텍스트를 가져옴 (크기 제한)."""
+    try:
+        cp = _run(["git", "diff", f"{base}...{head_ref}"], check=True)
+        text = cp.stdout
+        if len(text) > max_chars:
+            text = text[:max_chars] + "\n\n... (diff truncated) ..."
+        return text
+    except subprocess.CalledProcessError:
+        return ""
+
+
+def _ask_openai_for_summary(
+    diff_text: str,
+    commits: list[dict[str, str]],
+    pr_type: str,
+    file_changes: str,
+) -> str | None:
+    """OpenAI API를 호출하여 PR 요약을 생성."""
+    api_key = _get_openai_key()
+    if not api_key:
+        return None
+
+    try:
+        from openai import OpenAI
+    except ImportError:
+        print("[pr-pipeline] openai SDK 없음, AI 요약 건너뜀", file=sys.stderr)
+        return None
+
+    model = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
+
+    commit_lines = "\n".join(
+        f"- {c['hash']} {c['subject']} ({c['author']}, {c['date']})"
+        for c in commits
+    )
+
+    prompt = f"""아래는 Git PR의 변경 내용입니다. 이 PR을 리뷰하는 팀원이 빠르게 이해할 수 있도록 한국어로 요약해주세요.
+
+## 규칙
+1. **변경 배경/동기**: 왜 이 변경이 필요했는지 커밋 메시지와 코드 변경에서 추론하여 1~2문장으로 작성
+2. **주요 변경 사항**: 핵심 변경을 bullet point로 정리. 각 항목은 "무엇을 왜 어떻게 바꿨는지" 한 문장으로
+3. **주의할 점**: 리뷰어가 특히 확인해야 할 부분 (breaking change, 새로운 의존성, 설계 변경 등)
+4. **영향 범위**: 이 변경이 기존 기능에 미치는 영향
+
+## 형식
+- 마크다운 사용
+- 기술적이되 읽기 쉽게
+- 불필요한 파일 목록 나열 금지 (이미 별도 섹션에 있음)
+- 코드 변경의 "의도"에 집중
+
+## PR 타입: {pr_type}
+
+## 커밋 히스토리
+{commit_lines}
+
+## 변경 파일 요약
+{file_changes}
+
+## Diff
+```
+{diff_text}
+```"""
+
+    try:
+        client = OpenAI(api_key=api_key)
+        response = client.chat.completions.create(
+            model=model,
+            max_tokens=2000,
+            temperature=0.2,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        if not response.choices:
+            return None
+        content = response.choices[0].message.content
+        return content.strip() if isinstance(content, str) else None
+    except Exception as e:
+        print(f"[pr-pipeline] OpenAI API 호출 실패: {e}", file=sys.stderr)
+        return None
+
+
+def _git_diff_summary_for_file(base: str, head_ref: str, filepath: str) -> dict[str, Any]:
+    """개별 파일의 변경 통계 및 변경된 함수/클래스 목록을 추출."""
+    info: dict[str, Any] = {"added": 0, "deleted": 0, "functions": [], "classes": []}
+    try:
+        cp = _run(["git", "diff", "--numstat", f"{base}...{head_ref}", "--", filepath], check=True)
+        for line in cp.stdout.strip().splitlines():
+            parts = line.split("\t")
+            if len(parts) >= 2:
+                info["added"] = int(parts[0]) if parts[0] != "-" else 0
+                info["deleted"] = int(parts[1]) if parts[1] != "-" else 0
+    except (subprocess.CalledProcessError, ValueError):
+        pass
+
+    if not filepath.endswith(".py"):
+        return info
+
+    try:
+        cp = _run(["git", "diff", f"{base}...{head_ref}", "--", filepath], check=True)
+        for line in cp.stdout.splitlines():
+            if line.startswith("@@") and "def " in line:
+                m = re.search(r"def (\w+)\(", line)
+                if m and m.group(1) not in info["functions"]:
+                    info["functions"].append(m.group(1))
+            if line.startswith("@@") and "class " in line:
+                m = re.search(r"class (\w+)", line)
+                if m and m.group(1) not in info["classes"]:
+                    info["classes"].append(m.group(1))
+            if line.startswith("+") and not line.startswith("+++"):
+                m = re.match(r"\+\s*def (\w+)\(", line)
+                if m and m.group(1) not in info["functions"]:
+                    info["functions"].append(m.group(1))
+                m = re.match(r"\+\s*class (\w+)", line)
+                if m and m.group(1) not in info["classes"]:
+                    info["classes"].append(m.group(1))
+    except subprocess.CalledProcessError:
+        pass
+    return info
+
+
+def _summarize_major_tasks(
+    pr_type: str,
+    diff_entries: list[DiffEntry],
+    base: str = "main",
+    head_ref: str = "HEAD",
+) -> list[str]:
     output_files = sum(1 for e in diff_entries if e.path.startswith("data/output/") and e.path.endswith(".csv"))
     input_files = sum(1 for e in diff_entries if e.path.startswith("data/input/"))
-    code_files = sum(1 for e in diff_entries if _is_structure_path(e.path))
+    structure_entries = [e for e in diff_entries if _is_structure_path(e.path)]
 
     tasks: list[str] = []
+
+    # ── 데이터 변경 상세 ──
     if pr_type in {"data", "both"}:
-        tasks.append(f"입력/결과 데이터 갱신 (input 변경 {input_files}건, output CSV 변경 {output_files}건)")
-    if pr_type in {"structure", "both"}:
-        tasks.append(f"수집/자동화 구조 코드 변경 (구조 파일 변경 {code_files}건)")
+        task = f"입력/결과 데이터 갱신 (input 변경 {input_files}건, output CSV 변경 {output_files}건)"
+        tasks.append(task)
+
+        # output 섹터별 요약
+        if output_files > 0:
+            by_sector: dict[str, list[str]] = {}
+            for e in diff_entries:
+                if e.path.startswith("data/output/") and e.path.endswith(".csv"):
+                    parts = e.path.split("/")
+                    sector = parts[2] if len(parts) > 2 else "unknown"
+                    ticker = Path(e.path).stem.rsplit("_", 1)[0] if "_" in Path(e.path).stem else ""
+                    if ticker:
+                        by_sector.setdefault(sector, []).append(ticker)
+            for sector, tickers in sorted(by_sector.items()):
+                unique = sorted(set(tickers))
+                if len(unique) <= 5:
+                    tasks.append(f"  - {sector}: {', '.join(unique)}")
+                else:
+                    tasks.append(f"  - {sector}: {', '.join(unique[:5])} 외 {len(unique) - 5}개")
+
+    # ── 구조 변경 상세 ──
+    if pr_type in {"structure", "both"} and structure_entries:
+        tasks.append(f"수집/자동화 구조 코드 변경 ({len(structure_entries)}건)")
+
+        for e in structure_entries:
+            if e.status == "D":
+                tasks.append(f"  - `{e.path}` 삭제")
+                continue
+
+            info = _git_diff_summary_for_file(base, head_ref, e.path)
+            stat_parts: list[str] = []
+            if info["added"]:
+                stat_parts.append(f"+{info['added']}")
+            if info["deleted"]:
+                stat_parts.append(f"-{info['deleted']}")
+            stat_str = f" ({', '.join(stat_parts)})" if stat_parts else ""
+
+            detail = f"  - `{e.path}`{stat_str}"
+
+            fn_parts: list[str] = []
+            if info["classes"]:
+                fn_parts.append(f"class: {', '.join(info['classes'][:5])}")
+            if info["functions"]:
+                fn_parts.append(f"fn: {', '.join(info['functions'][:8])}")
+            if fn_parts:
+                detail += f" → {'; '.join(fn_parts)}"
+
+            tasks.append(detail)
+
     tasks.append("PR 단계에서는 S3 무결성 검증 생략 (비용/IO 절감)")
     return tasks
+
+
+def _git_log_between(base: str, head_ref: str) -> list[dict[str, str]]:
+    """base...head_ref 사이의 커밋 로그를 가져옴."""
+    try:
+        cp = _run(
+            ["git", "log", "--pretty=format:%h|%s|%an|%ad", "--date=short", f"{base}...{head_ref}"],
+            check=True,
+        )
+    except subprocess.CalledProcessError:
+        return []
+    commits: list[dict[str, str]] = []
+    for line in cp.stdout.strip().splitlines():
+        if not line.strip():
+            continue
+        parts = line.split("|", 3)
+        if len(parts) >= 4:
+            commits.append({
+                "hash": parts[0],
+                "subject": parts[1],
+                "author": parts[2],
+                "date": parts[3],
+            })
+    return commits
+
+
+def _git_diff_stat(base: str, head_ref: str) -> str:
+    """base...head_ref 사이의 diff stat 요약."""
+    try:
+        cp = _run(["git", "diff", "--stat", f"{base}...{head_ref}"], check=True)
+        lines = cp.stdout.strip().splitlines()
+        if lines:
+            return lines[-1].strip()
+    except subprocess.CalledProcessError:
+        pass
+    return ""
+
+
+def _categorize_changed_files(entries: list[DiffEntry]) -> dict[str, list[DiffEntry]]:
+    """변경 파일을 카테고리별로 분류."""
+    categories: dict[str, list[DiffEntry]] = {
+        "src": [],
+        "automation": [],
+        "scripts": [],
+        "data/input": [],
+        "data/output": [],
+        "root": [],
+        "other": [],
+    }
+    for e in entries:
+        p = e.path
+        if p.startswith("src/"):
+            categories["src"].append(e)
+        elif p.startswith("automation/"):
+            categories["automation"].append(e)
+        elif p.startswith("scripts/"):
+            categories["scripts"].append(e)
+        elif p.startswith("data/input/"):
+            categories["data/input"].append(e)
+        elif p.startswith("data/output/"):
+            categories["data/output"].append(e)
+        elif "/" not in p:
+            categories["root"].append(e)
+        else:
+            categories["other"].append(e)
+    return {k: v for k, v in categories.items() if v}
+
+
+def _format_file_changes_section(entries: list[DiffEntry]) -> str:
+    """변경 파일 목록을 카테고리별로 포맷팅."""
+    STATUS_ICONS = {"A": "추가", "M": "수정", "D": "삭제", "R": "이름변경"}
+    categories = _categorize_changed_files(entries)
+
+    lines: list[str] = []
+    for category, cat_entries in categories.items():
+        if category == "data/output" and len(cat_entries) > 10:
+            lines.append(f"**{category}/** ({len(cat_entries)}건)")
+            by_sector: dict[str, int] = {}
+            for e in cat_entries:
+                parts = e.path.split("/")
+                sector = parts[2] if len(parts) > 2 else "unknown"
+                by_sector[sector] = by_sector.get(sector, 0) + 1
+            for sector, count in sorted(by_sector.items()):
+                lines.append(f"  - {sector}: {count}건")
+        else:
+            lines.append(f"**{category}/**")
+            for e in cat_entries:
+                status_label = STATUS_ICONS.get(e.status, e.status)
+                display_path = e.path
+                if e.old_path:
+                    display_path = f"{e.old_path} → {e.path}"
+                lines.append(f"  - `{display_path}` ({status_label})")
+    return "\n".join(lines)
+
+
+def _format_commit_log(commits: list[dict[str, str]]) -> str:
+    """커밋 로그를 테이블로 포맷팅."""
+    if not commits:
+        return "- 커밋 없음"
+    lines: list[str] = []
+    lines.append("| hash | date | author | message |")
+    lines.append("|---|---|---|---|")
+    for c in commits[:30]:
+        lines.append(f"| `{c['hash']}` | {c['date']} | {c['author']} | {c['subject']} |")
+    if len(commits) > 30:
+        lines.append(f"| ... | ... | ... | 외 {len(commits) - 30}건 |")
+    return "\n".join(lines)
 
 
 def _format_company_table(companies: list[dict[str, str]], output_added: dict[str, list[int]]) -> str:
@@ -485,6 +780,7 @@ def _write_pr_description(
     checks: list[CheckItem],
     companies: list[dict[str, str]],
     output_added: dict[str, list[int]],
+    use_agent: bool = True,
 ) -> None:
     overview = {
         "data": "기업코드/수집 결과 중심의 단순 데이터 수집 PR입니다.",
@@ -492,48 +788,96 @@ def _write_pr_description(
         "both": "데이터 수집과 구조 변경이 함께 포함된 PR입니다.",
     }[pr_type]
 
-    major_tasks = _summarize_major_tasks(pr_type, diff_entries)
     company_table = _format_company_table(companies, output_added)
     check_table = _build_check_section(checks)
     pass_count = sum(1 for c in checks if c.status == "PASS")
     warn_count = sum(1 for c in checks if c.status == "WARN")
     fail_count = sum(1 for c in checks if c.status == "FAIL")
 
+    # 커밋 로그 & diff stat
+    commits = _git_log_between(base, branch)
+    diff_stat = _git_diff_stat(base, branch)
+    file_changes = _format_file_changes_section(diff_entries)
+    commit_table = _format_commit_log(commits)
+
+    # ── AI Agent 요약 ──
+    ai_summary: str | None = None
+    if use_agent:
+        print("[pr-pipeline] OpenAI에게 PR 요약 요청 중...", file=sys.stderr)
+        diff_text = _get_diff_text(base, branch)
+        ai_summary = _ask_openai_for_summary(diff_text, commits, pr_type, file_changes)
+        if ai_summary:
+            print("[pr-pipeline] AI 요약 생성 완료", file=sys.stderr)
+        else:
+            print("[pr-pipeline] AI 요약 건너뜀 (API 키 없음 또는 실패)", file=sys.stderr)
+
     lines: list[str] = []
-    lines.append(f"# { _build_title(pr_type) }")
+    lines.append(f"# {_build_title(pr_type)}")
     lines.append("")
     lines.append("## 개요")
     lines.append(f"- PR 타입: `{pr_type}`")
     lines.append(f"- 비교 기준: `{base}...{branch}`")
+    lines.append(f"- 총 변경: {len(diff_entries)}개 파일 ({diff_stat})" if diff_stat else f"- 총 변경: {len(diff_entries)}개 파일")
     lines.append(f"- 설명: {overview}")
     lines.append("")
-    lines.append("## 주요 업무")
-    for task in major_tasks:
-        lines.append(f"- {task}")
+
+    # ── AI 요약 (핵심 섹션) ──
+    if ai_summary:
+        lines.append("## 변경 요약")
+        lines.append(ai_summary)
+        lines.append("")
+
+    # ── 커밋 히스토리 ──
+    lines.append("<details>")
+    lines.append("<summary>커밋 히스토리</summary>")
     lines.append("")
-    lines.append("## 추가한 기업 목록")
-    lines.append(company_table)
+    lines.append(commit_table)
     lines.append("")
+    lines.append("</details>")
+    lines.append("")
+
+    # ── 변경 파일 상세 ──
+    lines.append("<details>")
+    lines.append("<summary>변경 파일 상세</summary>")
+    lines.append("")
+    lines.append(file_changes)
+    lines.append("")
+    lines.append("</details>")
+    lines.append("")
+
+    # ── 추가 기업 목록 ──
+    if companies or output_added:
+        lines.append("<details>")
+        lines.append("<summary>추가한 기업 목록</summary>")
+        lines.append("")
+        lines.append(company_table)
+        lines.append("")
+        lines.append("</details>")
+        lines.append("")
+
+    # ── 점검 결과 ──
     lines.append("## 점검 결과 (S3 제외)")
     lines.append(f"- 요약: PASS {pass_count} / WARN {warn_count} / FAIL {fail_count}")
     lines.append(check_table)
     lines.append("")
+
+    # ── WARN/FAIL 상세 ──
+    flagged = [c for c in checks if c.status in {"WARN", "FAIL"}]
+    if flagged:
+        lines.append("## 점검 상세")
+        for item in flagged:
+            icon = "⚠️" if item.status == "WARN" else "❌"
+            lines.append(f"### {icon} {item.name} ({item.status})")
+            lines.append(f"- {item.summary}")
+            if item.details:
+                for d in item.details:
+                    lines.append(f"  - {d}")
+        lines.append("")
+
+    # ── 앞으로 할 일 ──
     lines.append("## 앞으로 진행할 내용")
     lines.append("- 필요 시 `python3 -m automation.run_checks --mode s3-only`로 S3 무결성 별도 점검")
     lines.append("- PR 리뷰 반영 후 커밋 정리 및 머지")
-
-    # 실패 상세 출력
-    failed = [c for c in checks if c.status == "FAIL"]
-    if failed:
-        lines.append("")
-        lines.append("## 실패 상세")
-        for item in failed:
-            lines.append(f"### {item.name}")
-            if item.details:
-                for d in item.details:
-                    lines.append(f"- {d}")
-            else:
-                lines.append("- detail 없음")
 
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -589,6 +933,11 @@ def main() -> int:
     parser.add_argument("--create-pr", action="store_true")
     parser.add_argument("--draft", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--no-agent",
+        action="store_true",
+        help="AI agent 요약을 건너뛰고 기계적 분석만 사용",
+    )
     args = parser.parse_args()
 
     current_branch = _git_current_branch()
@@ -661,6 +1010,7 @@ def main() -> int:
         checks=checks,
         companies=companies,
         output_added=output_added,
+        use_agent=not args.no_agent,
     )
     print(f"[pr-pipeline] wrote {body_path}")
 
