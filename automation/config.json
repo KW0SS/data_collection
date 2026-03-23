@@ -1,0 +1,34 @@
+{
+  "reports_dir": "automation/reports",
+  "checks": {
+    "input_schema": {
+      "path": "data/input/companies_template.csv",
+      "required_columns": [
+        "stock_code",
+        "corp_name",
+        "label",
+        "gics_sector",
+        "start_year",
+        "end_year"
+      ]
+    },
+    "local_data": {
+      "output_dir": "data/output",
+      "raw_dir": "data/raw",
+      "sample_size": 50
+    },
+    "log_schema": {
+      "log_dir": "logs",
+      "max_files": 20
+    },
+    "s3_integrity": {
+      "log_dir": "logs",
+      "max_logs": 5,
+      "sample_size": 10,
+      "allowed_missing": 0,
+      "random_seed": 42,
+      "bucket": null
+    }
+  }
+}
+
