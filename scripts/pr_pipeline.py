@@ -63,8 +63,21 @@ def _git_current_branch() -> str:
     return cp.stdout.strip()
 
 
-def _git_diff_entries(base: str) -> list[DiffEntry]:
-    cp = _run(["git", "diff", "--name-status", "--find-renames", f"{base}...HEAD"])
+def _git_ref_exists(ref: str) -> bool:
+    try:
+        _run(["git", "rev-parse", "--verify", ref], check=True)
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
+
+def _git_resolve_ref(ref: str) -> str:
+    cp = _run(["git", "rev-parse", "--verify", ref])
+    return cp.stdout.strip()
+
+
+def _git_diff_entries(base: str, head_ref: str) -> list[DiffEntry]:
+    cp = _run(["git", "diff", "--name-status", "--find-renames", f"{base}...{head_ref}"])
     entries: list[DiffEntry] = []
     for raw in cp.stdout.splitlines():
         if not raw.strip():
@@ -190,11 +203,15 @@ def _rows_to_company_map(rows: list[dict[str, str]]) -> dict[str, dict[str, str]
     return out
 
 
-def _extract_added_companies(base: str) -> list[dict[str, str]]:
+def _extract_added_companies(base: str, head_ref: str, include_worktree: bool) -> list[dict[str, str]]:
     added: dict[str, dict[str, str]] = {}
     for path in COMPANY_CSV_CANDIDATES:
         base_map = _rows_to_company_map(_load_csv_from_git(base, path))
-        head_map = _rows_to_company_map(_load_csv_from_worktree(path))
+        if include_worktree:
+            head_rows = _load_csv_from_worktree(path)
+        else:
+            head_rows = _load_csv_from_git(head_ref, path)
+        head_map = _rows_to_company_map(head_rows)
         for code, row in head_map.items():
             if code not in base_map:
                 added.setdefault(code, row)
@@ -302,6 +319,15 @@ def _run_structure_checks(diff_entries: list[DiffEntry]) -> list[CheckItem]:
             )
         )
     return checks
+
+
+def _skip_structure_runtime_checks(head_ref: str) -> CheckItem:
+    return CheckItem(
+        name="structure_runtime_checks",
+        status="WARN",
+        summary=f"head-ref ({head_ref}) is not checked out; runtime checks skipped",
+        details=["현재 워킹트리 기준 커맨드 체크는 신뢰도가 낮아 구조 런타임 점검을 건너뜁니다."],
+    )
 
 
 def _run_non_s3_checks(check_config: str) -> CheckItem:
@@ -535,6 +561,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="PR pipeline (no S3 checks)")
     parser.add_argument("--base", default="main", help="Base branch/ref for diff")
     parser.add_argument(
+        "--head-ref",
+        default="HEAD",
+        help="Head branch/ref for diff (default: HEAD)",
+    )
+    parser.add_argument(
         "--type",
         choices=["auto", "data", "structure", "both"],
         default="auto",
@@ -560,9 +591,28 @@ def main() -> int:
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
-    branch = _git_current_branch()
-    head_entries = _git_diff_entries(args.base)
-    worktree_entries = _git_worktree_entries() if args.include_worktree else []
+    current_branch = _git_current_branch()
+    if not _git_ref_exists(args.base):
+        print(f"Base ref not found: {args.base}")
+        return 2
+    if not _git_ref_exists(args.head_ref):
+        print(f"Head ref not found: {args.head_ref}")
+        return 2
+
+    head_sha = _git_resolve_ref(args.head_ref)
+    current_sha = _git_resolve_ref("HEAD")
+    head_is_checked_out = head_sha == current_sha
+    branch = current_branch if args.head_ref == "HEAD" else args.head_ref
+
+    if args.include_worktree and not head_is_checked_out:
+        print(
+            "Cannot use --include-worktree when --head-ref is not currently checked out. "
+            "Switch to that branch or remove --include-worktree."
+        )
+        return 2
+
+    head_entries = _git_diff_entries(args.base, args.head_ref)
+    worktree_entries = _git_worktree_entries() if args.include_worktree and head_is_checked_out else []
     diff_entries = _merge_entries(head_entries, worktree_entries)
     if not diff_entries:
         print("No diff entries found. Nothing to build for PR.")
@@ -572,7 +622,10 @@ def main() -> int:
     pr_type = auto_type if args.type == "auto" else args.type
     issue_number = _extract_issue_number(branch, args.issue)
     work_label = _sanitize_slug(args.work_label or _default_work_label(pr_type))
-    print(f"[pr-pipeline] base={args.base} branch={branch} type={pr_type} auto={auto_type}")
+    print(
+        f"[pr-pipeline] base={args.base} head={branch} current={current_branch} "
+        f"type={pr_type} auto={auto_type}"
+    )
     print(f"[pr-pipeline] changed files: data={counts['data']} structure={counts['structure']} other={counts['other']}")
 
     checks: list[CheckItem] = []
@@ -580,11 +633,18 @@ def main() -> int:
     checks.append(_run_non_s3_checks(args.check_config))
 
     if pr_type in {"structure", "both"}:
-        checks.extend(_run_structure_checks(diff_entries))
+        if head_is_checked_out:
+            checks.extend(_run_structure_checks(diff_entries))
+        else:
+            checks.append(_skip_structure_runtime_checks(branch))
     if pr_type in {"data", "both"}:
         checks.append(_validate_output_filename_patterns(diff_entries))
 
-    companies = _extract_added_companies(args.base)
+    companies = _extract_added_companies(
+        base=args.base,
+        head_ref=args.head_ref,
+        include_worktree=args.include_worktree,
+    )
     output_added = _extract_output_added(diff_entries)
 
     body_path = (
@@ -611,6 +671,8 @@ def main() -> int:
 
     title = args.title or _build_title(pr_type)
     if args.create_pr:
+        if args.head_ref != "HEAD":
+            print("Warning: creating PR with explicit --head-ref. Ensure the branch is pushed to remote.")
         if args.dry_run:
             print(
                 "[dry-run] gh pr create --base "
