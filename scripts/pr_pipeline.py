@@ -63,8 +63,21 @@ def _git_current_branch() -> str:
     return cp.stdout.strip()
 
 
-def _git_diff_entries(base: str) -> list[DiffEntry]:
-    cp = _run(["git", "diff", "--name-status", "--find-renames", f"{base}...HEAD"])
+def _git_ref_exists(ref: str) -> bool:
+    try:
+        _run(["git", "rev-parse", "--verify", ref], check=True)
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
+
+def _git_resolve_ref(ref: str) -> str:
+    cp = _run(["git", "rev-parse", "--verify", ref])
+    return cp.stdout.strip()
+
+
+def _git_diff_entries(base: str, head_ref: str) -> list[DiffEntry]:
+    cp = _run(["git", "diff", "--name-status", "--find-renames", f"{base}...{head_ref}"])
     entries: list[DiffEntry] = []
     for raw in cp.stdout.splitlines():
         if not raw.strip():
@@ -190,11 +203,15 @@ def _rows_to_company_map(rows: list[dict[str, str]]) -> dict[str, dict[str, str]
     return out
 
 
-def _extract_added_companies(base: str) -> list[dict[str, str]]:
+def _extract_added_companies(base: str, head_ref: str, include_worktree: bool) -> list[dict[str, str]]:
     added: dict[str, dict[str, str]] = {}
     for path in COMPANY_CSV_CANDIDATES:
         base_map = _rows_to_company_map(_load_csv_from_git(base, path))
-        head_map = _rows_to_company_map(_load_csv_from_worktree(path))
+        if include_worktree:
+            head_rows = _load_csv_from_worktree(path)
+        else:
+            head_rows = _load_csv_from_git(head_ref, path)
+        head_map = _rows_to_company_map(head_rows)
         for code, row in head_map.items():
             if code not in base_map:
                 added.setdefault(code, row)
@@ -304,6 +321,15 @@ def _run_structure_checks(diff_entries: list[DiffEntry]) -> list[CheckItem]:
     return checks
 
 
+def _skip_structure_runtime_checks(head_ref: str) -> CheckItem:
+    return CheckItem(
+        name="structure_runtime_checks",
+        status="WARN",
+        summary=f"head-ref ({head_ref}) is not checked out; runtime checks skipped",
+        details=["현재 워킹트리 기준 커맨드 체크는 신뢰도가 낮아 구조 런타임 점검을 건너뜁니다."],
+    )
+
+
 def _run_non_s3_checks(check_config: str) -> CheckItem:
     cmd = ["python3", "-m", "automation.run_checks", "--mode", "non-s3", "--config", check_config]
     try:
@@ -378,18 +404,250 @@ def _build_body_file_path(
     return folder / f"{issue_number}_{work_label}.md"
 
 
-def _summarize_major_tasks(pr_type: str, diff_entries: list[DiffEntry]) -> list[str]:
+# ── 구조화된 분석 컨텍스트 출력 ─────────────────────────────────
+def _build_analysis_context(
+    pr_type: str,
+    base: str,
+    branch: str,
+    diff_entries: list[DiffEntry],
+    checks: list[CheckItem],
+    companies: list[dict[str, str]],
+    output_added: dict[str, list[int]],
+    commits: list[dict[str, str]],
+    diff_stat: str,
+) -> dict[str, Any]:
+    """에이전트가 분석에 사용할 구조화된 컨텍스트를 생성."""
+    return {
+        "pr_type": pr_type,
+        "base": base,
+        "branch": branch,
+        "diff_stat": diff_stat,
+        "total_files": len(diff_entries),
+        "commits": commits,
+        "files": [
+            {"status": e.status, "path": e.path, "old_path": e.old_path}
+            for e in diff_entries
+        ],
+        "checks": [
+            {"name": c.name, "status": c.status, "summary": c.summary, "details": c.details}
+            for c in checks
+        ],
+        "companies": companies,
+        "output_added": {k: v for k, v in output_added.items()},
+    }
+
+
+def _git_diff_summary_for_file(base: str, head_ref: str, filepath: str) -> dict[str, Any]:
+    """개별 파일의 변경 통계 및 변경된 함수/클래스 목록을 추출."""
+    info: dict[str, Any] = {"added": 0, "deleted": 0, "functions": [], "classes": []}
+    try:
+        cp = _run(["git", "diff", "--numstat", f"{base}...{head_ref}", "--", filepath], check=True)
+        for line in cp.stdout.strip().splitlines():
+            parts = line.split("\t")
+            if len(parts) >= 2:
+                info["added"] = int(parts[0]) if parts[0] != "-" else 0
+                info["deleted"] = int(parts[1]) if parts[1] != "-" else 0
+    except (subprocess.CalledProcessError, ValueError):
+        pass
+
+    if not filepath.endswith(".py"):
+        return info
+
+    try:
+        cp = _run(["git", "diff", f"{base}...{head_ref}", "--", filepath], check=True)
+        for line in cp.stdout.splitlines():
+            if line.startswith("@@") and "def " in line:
+                m = re.search(r"def (\w+)\(", line)
+                if m and m.group(1) not in info["functions"]:
+                    info["functions"].append(m.group(1))
+            if line.startswith("@@") and "class " in line:
+                m = re.search(r"class (\w+)", line)
+                if m and m.group(1) not in info["classes"]:
+                    info["classes"].append(m.group(1))
+            if line.startswith("+") and not line.startswith("+++"):
+                m = re.match(r"\+\s*def (\w+)\(", line)
+                if m and m.group(1) not in info["functions"]:
+                    info["functions"].append(m.group(1))
+                m = re.match(r"\+\s*class (\w+)", line)
+                if m and m.group(1) not in info["classes"]:
+                    info["classes"].append(m.group(1))
+    except subprocess.CalledProcessError:
+        pass
+    return info
+
+
+def _summarize_major_tasks(
+    pr_type: str,
+    diff_entries: list[DiffEntry],
+    base: str = "main",
+    head_ref: str = "HEAD",
+) -> list[str]:
     output_files = sum(1 for e in diff_entries if e.path.startswith("data/output/") and e.path.endswith(".csv"))
     input_files = sum(1 for e in diff_entries if e.path.startswith("data/input/"))
-    code_files = sum(1 for e in diff_entries if _is_structure_path(e.path))
+    structure_entries = [e for e in diff_entries if _is_structure_path(e.path)]
 
     tasks: list[str] = []
+
+    # ── 데이터 변경 상세 ──
     if pr_type in {"data", "both"}:
-        tasks.append(f"입력/결과 데이터 갱신 (input 변경 {input_files}건, output CSV 변경 {output_files}건)")
-    if pr_type in {"structure", "both"}:
-        tasks.append(f"수집/자동화 구조 코드 변경 (구조 파일 변경 {code_files}건)")
+        task = f"입력/결과 데이터 갱신 (input 변경 {input_files}건, output CSV 변경 {output_files}건)"
+        tasks.append(task)
+
+        # output 섹터별 요약
+        if output_files > 0:
+            by_sector: dict[str, list[str]] = {}
+            for e in diff_entries:
+                if e.path.startswith("data/output/") and e.path.endswith(".csv"):
+                    parts = e.path.split("/")
+                    sector = parts[2] if len(parts) > 2 else "unknown"
+                    ticker = Path(e.path).stem.rsplit("_", 1)[0] if "_" in Path(e.path).stem else ""
+                    if ticker:
+                        by_sector.setdefault(sector, []).append(ticker)
+            for sector, tickers in sorted(by_sector.items()):
+                unique = sorted(set(tickers))
+                if len(unique) <= 5:
+                    tasks.append(f"  - {sector}: {', '.join(unique)}")
+                else:
+                    tasks.append(f"  - {sector}: {', '.join(unique[:5])} 외 {len(unique) - 5}개")
+
+    # ── 구조 변경 상세 ──
+    if pr_type in {"structure", "both"} and structure_entries:
+        tasks.append(f"수집/자동화 구조 코드 변경 ({len(structure_entries)}건)")
+
+        for e in structure_entries:
+            if e.status == "D":
+                tasks.append(f"  - `{e.path}` 삭제")
+                continue
+
+            info = _git_diff_summary_for_file(base, head_ref, e.path)
+            stat_parts: list[str] = []
+            if info["added"]:
+                stat_parts.append(f"+{info['added']}")
+            if info["deleted"]:
+                stat_parts.append(f"-{info['deleted']}")
+            stat_str = f" ({', '.join(stat_parts)})" if stat_parts else ""
+
+            detail = f"  - `{e.path}`{stat_str}"
+
+            fn_parts: list[str] = []
+            if info["classes"]:
+                fn_parts.append(f"class: {', '.join(info['classes'][:5])}")
+            if info["functions"]:
+                fn_parts.append(f"fn: {', '.join(info['functions'][:8])}")
+            if fn_parts:
+                detail += f" → {'; '.join(fn_parts)}"
+
+            tasks.append(detail)
+
     tasks.append("PR 단계에서는 S3 무결성 검증 생략 (비용/IO 절감)")
     return tasks
+
+
+def _git_log_between(base: str, head_ref: str) -> list[dict[str, str]]:
+    """base..head_ref 사이의 커밋 로그를 가져옴 (head 쪽 고유 커밋만)."""
+    try:
+        cp = _run(
+            ["git", "log", "--pretty=format:%h|%s|%an|%ad", "--date=short", f"{base}..{head_ref}"],
+            check=True,
+        )
+    except subprocess.CalledProcessError:
+        return []
+    commits: list[dict[str, str]] = []
+    for line in cp.stdout.strip().splitlines():
+        if not line.strip():
+            continue
+        parts = line.split("|", 3)
+        if len(parts) >= 4:
+            commits.append({
+                "hash": parts[0],
+                "subject": parts[1],
+                "author": parts[2],
+                "date": parts[3],
+            })
+    return commits
+
+
+def _git_diff_stat(base: str, head_ref: str) -> str:
+    """base...head_ref 사이의 diff stat 요약."""
+    try:
+        cp = _run(["git", "diff", "--stat", f"{base}...{head_ref}"], check=True)
+        lines = cp.stdout.strip().splitlines()
+        if lines:
+            return lines[-1].strip()
+    except subprocess.CalledProcessError:
+        pass
+    return ""
+
+
+def _categorize_changed_files(entries: list[DiffEntry]) -> dict[str, list[DiffEntry]]:
+    """변경 파일을 카테고리별로 분류."""
+    categories: dict[str, list[DiffEntry]] = {
+        "src": [],
+        "automation": [],
+        "scripts": [],
+        "data/input": [],
+        "data/output": [],
+        "root": [],
+        "other": [],
+    }
+    for e in entries:
+        p = e.path
+        if p.startswith("src/"):
+            categories["src"].append(e)
+        elif p.startswith("automation/"):
+            categories["automation"].append(e)
+        elif p.startswith("scripts/"):
+            categories["scripts"].append(e)
+        elif p.startswith("data/input/"):
+            categories["data/input"].append(e)
+        elif p.startswith("data/output/"):
+            categories["data/output"].append(e)
+        elif "/" not in p:
+            categories["root"].append(e)
+        else:
+            categories["other"].append(e)
+    return {k: v for k, v in categories.items() if v}
+
+
+def _format_file_changes_section(entries: list[DiffEntry]) -> str:
+    """변경 파일 목록을 카테고리별로 포맷팅."""
+    STATUS_ICONS = {"A": "추가", "M": "수정", "D": "삭제", "R": "이름변경"}
+    categories = _categorize_changed_files(entries)
+
+    lines: list[str] = []
+    for category, cat_entries in categories.items():
+        if category == "data/output" and len(cat_entries) > 10:
+            lines.append(f"**{category}/** ({len(cat_entries)}건)")
+            by_sector: dict[str, int] = {}
+            for e in cat_entries:
+                parts = e.path.split("/")
+                sector = parts[2] if len(parts) > 2 else "unknown"
+                by_sector[sector] = by_sector.get(sector, 0) + 1
+            for sector, count in sorted(by_sector.items()):
+                lines.append(f"  - {sector}: {count}건")
+        else:
+            lines.append(f"**{category}/**")
+            for e in cat_entries:
+                status_label = STATUS_ICONS.get(e.status, e.status)
+                display_path = e.path
+                if e.old_path:
+                    display_path = f"{e.old_path} → {e.path}"
+                lines.append(f"  - `{display_path}` ({status_label})")
+    return "\n".join(lines)
+
+
+def _format_commit_log(commits: list[dict[str, str]]) -> str:
+    """커밋 로그를 테이블로 포맷팅."""
+    if not commits:
+        return "- 커밋 없음"
+    lines: list[str] = []
+    lines.append("| hash | date | author | message |")
+    lines.append("|---|---|---|---|")
+    for c in commits[:30]:
+        lines.append(f"| `{c['hash']}` | {c['date']} | {c['author']} | {c['subject']} |")
+    if len(commits) > 30:
+        lines.append(f"| ... | ... | ... | 외 {len(commits) - 30}건 |")
+    return "\n".join(lines)
 
 
 def _format_company_table(companies: list[dict[str, str]], output_added: dict[str, list[int]]) -> str:
@@ -466,48 +724,85 @@ def _write_pr_description(
         "both": "데이터 수집과 구조 변경이 함께 포함된 PR입니다.",
     }[pr_type]
 
-    major_tasks = _summarize_major_tasks(pr_type, diff_entries)
     company_table = _format_company_table(companies, output_added)
     check_table = _build_check_section(checks)
     pass_count = sum(1 for c in checks if c.status == "PASS")
     warn_count = sum(1 for c in checks if c.status == "WARN")
     fail_count = sum(1 for c in checks if c.status == "FAIL")
 
+    # 커밋 로그 & diff stat
+    commits = _git_log_between(base, branch)
+    diff_stat = _git_diff_stat(base, branch)
+    file_changes = _format_file_changes_section(diff_entries)
+    commit_table = _format_commit_log(commits)
+
     lines: list[str] = []
-    lines.append(f"# { _build_title(pr_type) }")
+    lines.append(f"# {_build_title(pr_type)}")
     lines.append("")
     lines.append("## 개요")
     lines.append(f"- PR 타입: `{pr_type}`")
     lines.append(f"- 비교 기준: `{base}...{branch}`")
+    lines.append(f"- 총 변경: {len(diff_entries)}개 파일 ({diff_stat})" if diff_stat else f"- 총 변경: {len(diff_entries)}개 파일")
     lines.append(f"- 설명: {overview}")
     lines.append("")
-    lines.append("## 주요 업무")
-    for task in major_tasks:
-        lines.append(f"- {task}")
+
+    # ── 변경 요약 (에이전트가 채울 자리) ──
+    lines.append("## 변경 요약")
+    lines.append("<!-- 에이전트에게 'PR 분석해줘'라고 요청하면 이 섹션을 자동 작성합니다 -->")
+    lines.append("_(에이전트 분석 대기 중)_")
     lines.append("")
-    lines.append("## 추가한 기업 목록")
-    lines.append(company_table)
+
+    # ── 커밋 히스토리 ──
+    lines.append("<details>")
+    lines.append("<summary>커밋 히스토리</summary>")
     lines.append("")
+    lines.append(commit_table)
+    lines.append("")
+    lines.append("</details>")
+    lines.append("")
+
+    # ── 변경 파일 상세 ──
+    lines.append("<details>")
+    lines.append("<summary>변경 파일 상세</summary>")
+    lines.append("")
+    lines.append(file_changes)
+    lines.append("")
+    lines.append("</details>")
+    lines.append("")
+
+    # ── 추가 기업 목록 ──
+    if companies or output_added:
+        lines.append("<details>")
+        lines.append("<summary>추가한 기업 목록</summary>")
+        lines.append("")
+        lines.append(company_table)
+        lines.append("")
+        lines.append("</details>")
+        lines.append("")
+
+    # ── 점검 결과 ──
     lines.append("## 점검 결과 (S3 제외)")
     lines.append(f"- 요약: PASS {pass_count} / WARN {warn_count} / FAIL {fail_count}")
     lines.append(check_table)
     lines.append("")
+
+    # ── WARN/FAIL 상세 ──
+    flagged = [c for c in checks if c.status in {"WARN", "FAIL"}]
+    if flagged:
+        lines.append("## 점검 상세")
+        for item in flagged:
+            icon = "⚠️" if item.status == "WARN" else "❌"
+            lines.append(f"### {icon} {item.name} ({item.status})")
+            lines.append(f"- {item.summary}")
+            if item.details:
+                for d in item.details:
+                    lines.append(f"  - {d}")
+        lines.append("")
+
+    # ── 앞으로 할 일 ──
     lines.append("## 앞으로 진행할 내용")
     lines.append("- 필요 시 `python3 -m automation.run_checks --mode s3-only`로 S3 무결성 별도 점검")
     lines.append("- PR 리뷰 반영 후 커밋 정리 및 머지")
-
-    # 실패 상세 출력
-    failed = [c for c in checks if c.status == "FAIL"]
-    if failed:
-        lines.append("")
-        lines.append("## 실패 상세")
-        for item in failed:
-            lines.append(f"### {item.name}")
-            if item.details:
-                for d in item.details:
-                    lines.append(f"- {d}")
-            else:
-                lines.append("- detail 없음")
 
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -535,6 +830,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="PR pipeline (no S3 checks)")
     parser.add_argument("--base", default="main", help="Base branch/ref for diff")
     parser.add_argument(
+        "--head-ref",
+        default="HEAD",
+        help="Head branch/ref for diff (default: HEAD)",
+    )
+    parser.add_argument(
         "--type",
         choices=["auto", "data", "structure", "both"],
         default="auto",
@@ -558,11 +858,36 @@ def main() -> int:
     parser.add_argument("--create-pr", action="store_true")
     parser.add_argument("--draft", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--output-json",
+        metavar="JSON_PATH",
+        default="",
+        help="분석 컨텍스트를 JSON으로 저장 (에이전트 분석용)",
+    )
     args = parser.parse_args()
 
-    branch = _git_current_branch()
-    head_entries = _git_diff_entries(args.base)
-    worktree_entries = _git_worktree_entries() if args.include_worktree else []
+    current_branch = _git_current_branch()
+    if not _git_ref_exists(args.base):
+        print(f"Base ref not found: {args.base}")
+        return 2
+    if not _git_ref_exists(args.head_ref):
+        print(f"Head ref not found: {args.head_ref}")
+        return 2
+
+    head_sha = _git_resolve_ref(args.head_ref)
+    current_sha = _git_resolve_ref("HEAD")
+    head_is_checked_out = head_sha == current_sha
+    branch = current_branch if args.head_ref == "HEAD" else args.head_ref
+
+    if args.include_worktree and not head_is_checked_out:
+        print(
+            "Cannot use --include-worktree when --head-ref is not currently checked out. "
+            "Switch to that branch or remove --include-worktree."
+        )
+        return 2
+
+    head_entries = _git_diff_entries(args.base, args.head_ref)
+    worktree_entries = _git_worktree_entries() if args.include_worktree and head_is_checked_out else []
     diff_entries = _merge_entries(head_entries, worktree_entries)
     if not diff_entries:
         print("No diff entries found. Nothing to build for PR.")
@@ -572,7 +897,10 @@ def main() -> int:
     pr_type = auto_type if args.type == "auto" else args.type
     issue_number = _extract_issue_number(branch, args.issue)
     work_label = _sanitize_slug(args.work_label or _default_work_label(pr_type))
-    print(f"[pr-pipeline] base={args.base} branch={branch} type={pr_type} auto={auto_type}")
+    print(
+        f"[pr-pipeline] base={args.base} head={branch} current={current_branch} "
+        f"type={pr_type} auto={auto_type}"
+    )
     print(f"[pr-pipeline] changed files: data={counts['data']} structure={counts['structure']} other={counts['other']}")
 
     checks: list[CheckItem] = []
@@ -580,11 +908,18 @@ def main() -> int:
     checks.append(_run_non_s3_checks(args.check_config))
 
     if pr_type in {"structure", "both"}:
-        checks.extend(_run_structure_checks(diff_entries))
+        if head_is_checked_out:
+            checks.extend(_run_structure_checks(diff_entries))
+        else:
+            checks.append(_skip_structure_runtime_checks(branch))
     if pr_type in {"data", "both"}:
         checks.append(_validate_output_filename_patterns(diff_entries))
 
-    companies = _extract_added_companies(args.base)
+    companies = _extract_added_companies(
+        base=args.base,
+        head_ref=args.head_ref,
+        include_worktree=args.include_worktree,
+    )
     output_added = _extract_output_added(diff_entries)
 
     body_path = (
@@ -592,6 +927,10 @@ def main() -> int:
         if args.body_file
         else _build_body_file_path(args.pr_dir, issue_number, work_label)
     )
+
+    commits = _git_log_between(args.base, branch)
+    diff_stat = _git_diff_stat(args.base, branch)
+
     _write_pr_description(
         path=body_path,
         pr_type=pr_type,
@@ -604,6 +943,24 @@ def main() -> int:
     )
     print(f"[pr-pipeline] wrote {body_path}")
 
+    # ── 구조화 컨텍스트 JSON 출력 ──
+    if args.output_json:
+        ctx = _build_analysis_context(
+            pr_type=pr_type,
+            base=args.base,
+            branch=branch,
+            diff_entries=diff_entries,
+            checks=checks,
+            companies=companies,
+            output_added=output_added,
+            commits=commits,
+            diff_stat=diff_stat,
+        )
+        json_path = Path(args.output_json)
+        json_path.parent.mkdir(parents=True, exist_ok=True)
+        json_path.write_text(json.dumps(ctx, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"[pr-pipeline] context JSON → {json_path}")
+
     failed = [c for c in checks if c.status == "FAIL"]
     if failed:
         print("[pr-pipeline] checks failed; PR create skipped.")
@@ -611,6 +968,8 @@ def main() -> int:
 
     title = args.title or _build_title(pr_type)
     if args.create_pr:
+        if args.head_ref != "HEAD":
+            print("Warning: creating PR with explicit --head-ref. Ensure the branch is pushed to remote.")
         if args.dry_run:
             print(
                 "[dry-run] gh pr create --base "
