@@ -1,7 +1,7 @@
 # AGENTS.md
 
 ## Goal
-Route Codex requests into two tasks:
+Route agent requests into two tasks:
 - `branch_compare`
 - `pr_create`
 
@@ -21,9 +21,10 @@ Task specs:
 - For another local branch: `--head-ref <branch>`
 - Use `--include-worktree` only when head is currently checked out.
 
-## AI
-- Default: enabled (needs `OPENAI_API_KEY`)
-- Disable when requested: `--no-agent`
+## Agent-based analysis
+- PR 요약은 외부 API 없이 에이전트가 직접 diff를 분석하여 작성.
+- `--output-json prs/context.json` 옵션으로 구조화된 컨텍스트를 JSON 출력 가능.
+- 에이전트는 context JSON + `git diff`를 읽고 "변경 요약" 섹션을 채움.
 
 ## Output
 - `branch_compare`: commit delta, file diff, short risk notes.

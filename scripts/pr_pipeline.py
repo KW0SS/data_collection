@@ -416,7 +416,7 @@ def _build_analysis_context(
     commits: list[dict[str, str]],
     diff_stat: str,
 ) -> dict[str, Any]:
-    """Claude Code 에이전트가 분석에 사용할 구조화된 컨텍스트를 생성."""
+    """에이전트가 분석에 사용할 구조화된 컨텍스트를 생성."""
     return {
         "pr_type": pr_type,
         "base": base,
@@ -544,10 +544,10 @@ def _summarize_major_tasks(
 
 
 def _git_log_between(base: str, head_ref: str) -> list[dict[str, str]]:
-    """base...head_ref 사이의 커밋 로그를 가져옴."""
+    """base..head_ref 사이의 커밋 로그를 가져옴 (head 쪽 고유 커밋만)."""
     try:
         cp = _run(
-            ["git", "log", "--pretty=format:%h|%s|%an|%ad", "--date=short", f"{base}...{head_ref}"],
+            ["git", "log", "--pretty=format:%h|%s|%an|%ad", "--date=short", f"{base}..{head_ref}"],
             check=True,
         )
     except subprocess.CalledProcessError:
@@ -748,7 +748,7 @@ def _write_pr_description(
 
     # ── 변경 요약 (에이전트가 채울 자리) ──
     lines.append("## 변경 요약")
-    lines.append("<!-- Claude Code에게 'PR 분석해줘'라고 요청하면 이 섹션을 자동 작성합니다 -->")
+    lines.append("<!-- 에이전트에게 'PR 분석해줘'라고 요청하면 이 섹션을 자동 작성합니다 -->")
     lines.append("_(에이전트 분석 대기 중)_")
     lines.append("")
 
@@ -862,7 +862,7 @@ def main() -> int:
         "--output-json",
         metavar="JSON_PATH",
         default="",
-        help="분석 컨텍스트를 JSON으로 저장 (Claude Code 에이전트용)",
+        help="분석 컨텍스트를 JSON으로 저장 (에이전트 분석용)",
     )
     args = parser.parse_args()
 
