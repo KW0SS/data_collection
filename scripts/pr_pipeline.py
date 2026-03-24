@@ -5,7 +5,6 @@ import argparse
 import csv
 import io
 import json
-import os
 import re
 import subprocess
 import sys
@@ -405,99 +404,37 @@ def _build_body_file_path(
     return folder / f"{issue_number}_{work_label}.md"
 
 
-# ── AI Agent 요약 ──────────────────────────────────────────────
-def _get_openai_key() -> str | None:
-    """OPENAI_API_KEY를 환경변수 또는 .env에서 가져옴."""
-    key = os.getenv("OPENAI_API_KEY")
-    if key:
-        return key
-    env_path = Path(__file__).resolve().parent.parent / ".env"
-    if env_path.exists():
-        for line in env_path.read_text().splitlines():
-            line = line.strip()
-            if line.startswith("OPENAI_API_KEY="):
-                return line.split("=", 1)[1].strip().strip('"').strip("'")
-    return None
-
-
-def _get_diff_text(base: str, head_ref: str, max_chars: int = 80000) -> str:
-    """base...head_ref 사이의 diff 텍스트를 가져옴 (크기 제한)."""
-    try:
-        cp = _run(["git", "diff", f"{base}...{head_ref}"], check=True)
-        text = cp.stdout
-        if len(text) > max_chars:
-            text = text[:max_chars] + "\n\n... (diff truncated) ..."
-        return text
-    except subprocess.CalledProcessError:
-        return ""
-
-
-def _ask_openai_for_summary(
-    diff_text: str,
-    commits: list[dict[str, str]],
+# ── 구조화된 분석 컨텍스트 출력 ─────────────────────────────────
+def _build_analysis_context(
     pr_type: str,
-    file_changes: str,
-) -> str | None:
-    """OpenAI API를 호출하여 PR 요약을 생성."""
-    api_key = _get_openai_key()
-    if not api_key:
-        return None
-
-    try:
-        from openai import OpenAI
-    except ImportError:
-        print("[pr-pipeline] openai SDK 없음, AI 요약 건너뜀", file=sys.stderr)
-        return None
-
-    model = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
-
-    commit_lines = "\n".join(
-        f"- {c['hash']} {c['subject']} ({c['author']}, {c['date']})"
-        for c in commits
-    )
-
-    prompt = f"""아래는 Git PR의 변경 내용입니다. 이 PR을 리뷰하는 팀원이 빠르게 이해할 수 있도록 한국어로 요약해주세요.
-
-## 규칙
-1. **변경 배경/동기**: 왜 이 변경이 필요했는지 커밋 메시지와 코드 변경에서 추론하여 1~2문장으로 작성
-2. **주요 변경 사항**: 핵심 변경을 bullet point로 정리. 각 항목은 "무엇을 왜 어떻게 바꿨는지" 한 문장으로
-3. **주의할 점**: 리뷰어가 특히 확인해야 할 부분 (breaking change, 새로운 의존성, 설계 변경 등)
-4. **영향 범위**: 이 변경이 기존 기능에 미치는 영향
-
-## 형식
-- 마크다운 사용
-- 기술적이되 읽기 쉽게
-- 불필요한 파일 목록 나열 금지 (이미 별도 섹션에 있음)
-- 코드 변경의 "의도"에 집중
-
-## PR 타입: {pr_type}
-
-## 커밋 히스토리
-{commit_lines}
-
-## 변경 파일 요약
-{file_changes}
-
-## Diff
-```
-{diff_text}
-```"""
-
-    try:
-        client = OpenAI(api_key=api_key)
-        response = client.chat.completions.create(
-            model=model,
-            max_tokens=2000,
-            temperature=0.2,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        if not response.choices:
-            return None
-        content = response.choices[0].message.content
-        return content.strip() if isinstance(content, str) else None
-    except Exception as e:
-        print(f"[pr-pipeline] OpenAI API 호출 실패: {e}", file=sys.stderr)
-        return None
+    base: str,
+    branch: str,
+    diff_entries: list[DiffEntry],
+    checks: list[CheckItem],
+    companies: list[dict[str, str]],
+    output_added: dict[str, list[int]],
+    commits: list[dict[str, str]],
+    diff_stat: str,
+) -> dict[str, Any]:
+    """Claude Code 에이전트가 분석에 사용할 구조화된 컨텍스트를 생성."""
+    return {
+        "pr_type": pr_type,
+        "base": base,
+        "branch": branch,
+        "diff_stat": diff_stat,
+        "total_files": len(diff_entries),
+        "commits": commits,
+        "files": [
+            {"status": e.status, "path": e.path, "old_path": e.old_path}
+            for e in diff_entries
+        ],
+        "checks": [
+            {"name": c.name, "status": c.status, "summary": c.summary, "details": c.details}
+            for c in checks
+        ],
+        "companies": companies,
+        "output_added": {k: v for k, v in output_added.items()},
+    }
 
 
 def _git_diff_summary_for_file(base: str, head_ref: str, filepath: str) -> dict[str, Any]:
@@ -780,7 +717,6 @@ def _write_pr_description(
     checks: list[CheckItem],
     companies: list[dict[str, str]],
     output_added: dict[str, list[int]],
-    use_agent: bool = True,
 ) -> None:
     overview = {
         "data": "기업코드/수집 결과 중심의 단순 데이터 수집 PR입니다.",
@@ -800,17 +736,6 @@ def _write_pr_description(
     file_changes = _format_file_changes_section(diff_entries)
     commit_table = _format_commit_log(commits)
 
-    # ── AI Agent 요약 ──
-    ai_summary: str | None = None
-    if use_agent:
-        print("[pr-pipeline] OpenAI에게 PR 요약 요청 중...", file=sys.stderr)
-        diff_text = _get_diff_text(base, branch)
-        ai_summary = _ask_openai_for_summary(diff_text, commits, pr_type, file_changes)
-        if ai_summary:
-            print("[pr-pipeline] AI 요약 생성 완료", file=sys.stderr)
-        else:
-            print("[pr-pipeline] AI 요약 건너뜀 (API 키 없음 또는 실패)", file=sys.stderr)
-
     lines: list[str] = []
     lines.append(f"# {_build_title(pr_type)}")
     lines.append("")
@@ -821,11 +746,11 @@ def _write_pr_description(
     lines.append(f"- 설명: {overview}")
     lines.append("")
 
-    # ── AI 요약 (핵심 섹션) ──
-    if ai_summary:
-        lines.append("## 변경 요약")
-        lines.append(ai_summary)
-        lines.append("")
+    # ── 변경 요약 (에이전트가 채울 자리) ──
+    lines.append("## 변경 요약")
+    lines.append("<!-- Claude Code에게 'PR 분석해줘'라고 요청하면 이 섹션을 자동 작성합니다 -->")
+    lines.append("_(에이전트 분석 대기 중)_")
+    lines.append("")
 
     # ── 커밋 히스토리 ──
     lines.append("<details>")
@@ -934,9 +859,10 @@ def main() -> int:
     parser.add_argument("--draft", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument(
-        "--no-agent",
-        action="store_true",
-        help="AI agent 요약을 건너뛰고 기계적 분석만 사용",
+        "--output-json",
+        metavar="JSON_PATH",
+        default="",
+        help="분석 컨텍스트를 JSON으로 저장 (Claude Code 에이전트용)",
     )
     args = parser.parse_args()
 
@@ -1001,6 +927,10 @@ def main() -> int:
         if args.body_file
         else _build_body_file_path(args.pr_dir, issue_number, work_label)
     )
+
+    commits = _git_log_between(args.base, branch)
+    diff_stat = _git_diff_stat(args.base, branch)
+
     _write_pr_description(
         path=body_path,
         pr_type=pr_type,
@@ -1010,9 +940,26 @@ def main() -> int:
         checks=checks,
         companies=companies,
         output_added=output_added,
-        use_agent=not args.no_agent,
     )
     print(f"[pr-pipeline] wrote {body_path}")
+
+    # ── 구조화 컨텍스트 JSON 출력 ──
+    if args.output_json:
+        ctx = _build_analysis_context(
+            pr_type=pr_type,
+            base=args.base,
+            branch=branch,
+            diff_entries=diff_entries,
+            checks=checks,
+            companies=companies,
+            output_added=output_added,
+            commits=commits,
+            diff_stat=diff_stat,
+        )
+        json_path = Path(args.output_json)
+        json_path.parent.mkdir(parents=True, exist_ok=True)
+        json_path.write_text(json.dumps(ctx, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"[pr-pipeline] context JSON → {json_path}")
 
     failed = [c for c in checks if c.status == "FAIL"]
     if failed:
