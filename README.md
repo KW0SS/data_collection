@@ -1,6 +1,23 @@
 # 상폐 예측 모델용 재무비율 데이터 수집 도구
 
-코스닥 정상/상폐 기업의 **분기별 재무비율 30개**를 OpenDART API로 수집하여 CSV로 저장하는 도구입니다.
+코스닥 정상/상폐 기업의 **분기별 재무비율 30개**를 OpenDART API로 수집하여 CSV로 저장하고, 원본 재무제표 JSON을 S3에 업로드하는 도구입니다.
+
+---
+
+## 빠른 시작
+
+```bash
+# 1. 의존성 설치
+pip3 install -r requirements.txt
+
+# 2. .env 파일 생성 (API 키 설정)
+cp .env.example .env   # 또는 직접 생성
+
+# 3. 엑셀 파일 배치 (아래 '사전 준비' 참고)
+
+# 4. 통합 파이프라인 실행
+python3 run_pipeline.py --status normal --sectors "Information Technology" --member hann --skip-s3
+```
 
 ---
 
@@ -8,83 +25,181 @@
 
 ```
 data_collection/
-├── collect.py                      # CLI 진입점 (사용자가 실행하는 파일)
+├── run_pipeline.py                    # 통합 파이프라인 (기업 목록 → 수집 → S3)
+├── collect.py                         # CLI 진입점 (개별 수집)
 ├── src/
-│   ├── __init__.py
-│   ├── dart_api.py                 # OpenDART API 클라이언트
-│   ├── account_mapper.py           # DART 계정과목명 → 표준 키 매핑
-│   ├── ratio_calculator.py         # 30개 재무비율 계산기
-│   ├── collector.py                # 데이터 수집 오케스트레이터
-│   └── s3_uploader.py              # S3 업로드 모듈 (GICS 섹터별)
+│   ├── dart_api.py                    # OpenDART API 클라이언트
+│   ├── account_mapper.py              # DART 계정과목명 → 표준 키 매핑
+│   ├── ratio_calculator.py            # 30개 재무비율 계산기
+│   ├── collector.py                   # 데이터 수집 오케스트레이터
+│   └── s3_uploader.py                 # S3 업로드 모듈 (GICS 섹터별)
+├── f_make_A_input.py                  # 정상 기업 목록 생성 (KRX → A섹터 필터링)
+├── f_make_delisted_input.py           # 상폐 기업 목록 생성 (업종코드 → GICS 매핑)
+├── f_fetch_induty_codes.py            # 상폐 기업 업종코드 조회 (DART API)
+├── f_split_companies.py               # 기업 목록 분할 도구
 ├── data/
-│   ├── input/                      # 기업 목록 CSV
-│   │   ├── companies_template.csv  # 수집 대기열 (실행 후 비우고 재사용)
-│   │   └── companies_collected.csv # 수집 완료 기록 (자동 누적)
-│   ├── output/                     # 결과 재무비율 CSV (GICS 섹터별)
-│   └── raw/                        # 원본 재무제표 JSON (선택)
+│   ├── input/                         # 기업 목록 CSV + KRX 엑셀
+│   │   └── krx_all_companies.xlsx     # (수동 배치) KRX 전종목 엑셀
+│   ├── etc/                           # (수동 배치) 상폐 현황 + 기업코드
+│   │   ├── 상장폐지현황.xlsx            # KRX 상장폐지현황
+│   │   └── corp_codes.xml             # DART 고유번호 전체
+│   ├── output/                        # 결과 재무비율 CSV (GICS 섹터별)
+│   └── raw/                           # 원본 재무제표 JSON (선택)
 ├── requirements.txt
-└── .env                            # API 키 및 S3 설정
+└── .env                               # API 키 및 S3 설정
 ```
 
 ---
 
 ## 사전 준비
 
+### 1. 환경 설정
+
 - **Python** 3.10 이상
 - **OpenDART API 키** ([https://opendart.fss.or.kr](https://opendart.fss.or.kr) 에서 발급)
-- (권장) 인증서 문제 방지를 위해 certifi 설치:
-  ```bash
-  pip3 install certifi
-  ```
 
-## 설정
+```bash
+pip3 install -r requirements.txt
+```
 
-`.env` 파일을 프로젝트 루트에 생성하고 아래 설정을 추가합니다:
+### 2. `.env` 파일 설정
+
+프로젝트 루트에 `.env` 파일을 생성합니다:
 
 ```
 DART_API_KEY=발급받은_API_키
 
-# S3 업로드 기능 사용 시 (--upload-s3)
+# S3 업로드 기능 사용 시
 S3_ACCESS_KEY=AWS_Access_Key_ID
 S3_PRIVATE_KEY=AWS_Secret_Access_Key
 S3_BUCKET_NAME=my-bucket-name
-S3_REGION=ap-northeast-2          # 선택 (기본: ap-northeast-2)
+S3_REGION=ap-northeast-2
 ```
+
+### 3. 엑셀 파일 배치
+
+수집 대상에 따라 필요한 파일이 다릅니다:
+
+| 파일 | 경로 | 용도 | 필요 시점 |
+|---|---|---|---|
+| KRX 전종목 엑셀 | `data/input/krx_all_companies.xlsx` | 정상 기업 목록 생성 | `--status normal` 또는 `all` |
+| 상장폐지현황 엑셀 | `data/etc/상장폐지현황.xlsx` | 상폐 기업 목록 생성 | `--status delisted` 또는 `all` |
+| DART 고유번호 XML | `data/etc/corp_codes.xml` | 상폐 기업 업종코드 조회 | `--status delisted` (업종코드 캐시 없을 때) |
+
+**다운로드 방법:**
+- KRX 전종목: [KRX 정보데이터시스템](http://data.krx.co.kr) → 기본통계 → 전종목 기본정보 → 엑셀 다운로드
+- 상장폐지현황: [KRX KIND](https://kind.krx.co.kr) → 상장폐지종목 → 엑셀 다운로드
+- DART 고유번호: [DART OpenAPI](https://opendart.fss.or.kr) → 기업코드 다운로드 (ZIP 해제 후 XML)
 
 ---
 
 ## 사용법
 
-### 1) 종목코드로 직접 수집
+### 방법 1: 통합 파이프라인 (`run_pipeline.py`) — 권장
+
+엑셀 파일만 배치하면 **기업 목록 생성 → 재무제표 수집 → S3 업로드**를 한 번에 수행합니다.
 
 ```bash
-# 단일 기업, 특정 연도 → 019440_2023.csv 생성
+# 정상 기업만, IT 섹터
+python3 run_pipeline.py --status normal \
+    --sectors "Information Technology" \
+    --member hann
+
+# 상폐 기업만, Consumer Discretionary 섹터
+python3 run_pipeline.py --status delisted \
+    --sectors "Consumer Discretionary" \
+    --member hann
+
+# 정상 + 상폐 모두, 복수 섹터
+python3 run_pipeline.py --status all \
+    --sectors "Information Technology" "Communication Services" \
+    --member hann
+
+# 전체 섹터 (--sectors 미지정)
+python3 run_pipeline.py --status all --member hann
+
+# S3 업로드 건너뛰기 (수집만)
+python3 run_pipeline.py --status normal \
+    --sectors "Information Technology" \
+    --member hann --skip-s3
+
+# dry-run: 수집 대상 기업 목록만 확인
+python3 run_pipeline.py --status delisted \
+    --sectors "Information Technology" \
+    --member hann --dry-run
+
+# 이미 수집된 데이터도 재수집
+python3 run_pipeline.py --status normal \
+    --sectors "Information Technology" \
+    --member hann --force
+```
+
+#### `run_pipeline.py` CLI 옵션
+
+| 옵션 | 필수 | 설명 |
+|---|---|---|
+| `--status` | O | 수집 대상: `normal`(정상), `delisted`(상폐), `all`(전체) |
+| `--sectors` | X | GICS 섹터 목록 (미지정 시 전체 섹터) |
+| `--member` | O | 작업자 이름 (S3 로그 기록용) |
+| `--skip-s3` | X | S3 업로드 건너뛰기 |
+| `--force` | X | 이미 수집된 데이터도 재수집 |
+| `--dry-run` | X | 수집 대상 기업 목록만 출력하고 종료 |
+
+#### 지원 GICS 섹터
+
+| 섹터 | 포함 업종 |
+|---|---|
+| `Information Technology` | 반도체, 소프트웨어, 컴퓨터, 시스템통합, 정보서비스, 통신장비, 영상음향기기 등 |
+| `Communication Services` | 전기통신, 방송, 영화, 광고, 출판, 엔터테인먼트, 게임 등 |
+| `Consumer Discretionary` | 의복, 의류, 화장품, 가구, 숙박, 음식점, 소매 등 |
+
+#### 파이프라인 동작 흐름
+
+```
+엑셀 파일 (수동 배치)
+      │
+      ▼
+[1/3] 기업 목록 생성
+      ├── 정상 기업: KRX 엑셀 → 업종 필터링 → GICS 매핑
+      └── 상폐 기업: 업종코드 조회 → GICS 매핑 → 재무적 리스크 필터링
+      │
+      ▼
+[2/3] 재무제표 수집 (collect.py)
+      ├── DART API로 분기별 재무제표 조회
+      ├── 계정과목명 표준화 → 30개 재무비율 계산
+      └── CSV 저장: data/output/{섹터}/{종목코드}_{연도}.csv
+      │
+      ▼
+[3/3] S3 업로드
+      └── 원본 JSON을 s3://{bucket}/{healthy|delisted}/{섹터}/... 로 업로드
+```
+
+---
+
+### 방법 2: 개별 수집 (`collect.py`)
+
+기업 목록이 이미 있거나 개별 종목을 직접 수집할 때 사용합니다.
+
+#### 종목코드로 직접 수집
+
+```bash
+# 단일 기업, 특정 연도
 python3 collect.py collect --stock-codes 019440 --years 2023
 
-# 복수 기업, 복수 연도 → 019440_2020.csv ~ 005930_2023.csv 등 연도별 파일 생성
+# 복수 기업, 복수 연도
 python3 collect.py collect --stock-codes 019440 005930 --years 2020 2021 2022 2023
 
 # 특정 분기만 지정
 python3 collect.py collect --stock-codes 019440 --years 2023 --quarters Q1 ANNUAL
 
-# 저장 디렉터리 지정
-python3 collect.py collect --stock-codes 019440 --years 2023 -o data/output/my_folder/
-
 # 원본 재무제표 JSON도 함께 저장
 python3 collect.py collect --stock-codes 019440 --years 2023 --save-raw
 
-# S3에 GICS 섹터별로 원본 데이터 업로드 (기업 목록 CSV에 gics_sector 필요)
-python3 collect.py collect --companies data/input/companies.csv --years 2023 --upload-s3
-
-# S3 버킷 직접 지정
-python3 collect.py collect --companies data/input/companies.csv --years 2023 --upload-s3 --s3-bucket my-bucket
+# 저장 디렉터리 지정
+python3 collect.py collect --stock-codes 019440 --years 2023 -o data/output/my_folder/
 ```
 
-**파일명 규칙:** `{GICS섹터}/{종목코드}_{연도}.csv` (예: `Materials/019440_2023.csv`)
-
-### 2) 기업 목록 CSV로 배치 수집
-
-`data/input/companies.csv` 작성:
+#### 기업 목록 CSV로 배치 수집
 
 ```csv
 stock_code,corp_name,label,gics_sector,start_year,end_year
@@ -95,21 +210,18 @@ stock_code,corp_name,label,gics_sector,start_year,end_year
 
 | 컬럼 | 필수 | 설명 |
 |---|---|---|
-| `stock_code` | ✅ | 종목코드 (6자리) |
-| `corp_name` | ✅ | 기업명 (참고용) |
-| `label` | ✅ | 0=정상, 1=상폐 (모델 학습용 라벨) |
-| `gics_sector` | ⬜ | GICS 섹터명 (S3 업로드 시 디렉터리 구분에 사용) |
-| `start_year` | ⬜ | 수집 시작 연도 (기업별 개별 지정, 없으면 `--years` 사용) |
-| `end_year` | ⬜ | 수집 종료 연도 (`start_year`와 함께 사용) |
-
-> **기업별 연도 범위:** 기업마다 상장 기간이 다르므로, CSV에 `start_year`/`end_year`를 기업별로 지정하면 해당 범위만 수집합니다. 지정하지 않은 기업은 CLI의 `--years` 값을 사용합니다.
+| `stock_code` | O | 종목코드 (6자리) |
+| `corp_name` | O | 기업명 |
+| `label` | O | 0=정상, 1=상폐 |
+| `gics_sector` | X | GICS 섹터명 (S3 업로드/디렉터리 구분용) |
+| `start_year` | X | 수집 시작 연도 (미지정 시 `--years` 사용) |
+| `end_year` | X | 수집 종료 연도 |
 
 ```bash
-# CSV에 start_year/end_year가 있으면 --years는 미지정 기업에만 적용됨
-python3 collect.py collect --companies data/input/companies.csv --years 2023
+python3 collect.py collect --companies data/input/companies.csv
 ```
 
-### 3) 기업 검색 (DART 고유코드 조회)
+#### 기업 검색
 
 ```bash
 python3 collect.py search --name 세아특수강
@@ -117,7 +229,7 @@ python3 collect.py search --stock-code 019440
 python3 collect.py search --name 삼성 --limit 10
 ```
 
-### 전체 CLI 옵션
+#### `collect.py` CLI 옵션
 
 ```
 collect.py collect
@@ -128,10 +240,11 @@ collect.py collect
   --fs-div            CFS=연결재무제표, OFS=별도재무제표 (기본: CFS)
   --output-dir, -o    결과 CSV 저장 디렉터리 (기본: data/output/)
   --save-raw          원본 재무제표 JSON을 data/raw/에 저장
-  --upload-s3         원본 재무제표 JSON을 S3에 GICS 섹터별로 업로드
+  --upload-s3         원본 재무제표 JSON을 S3에 업로드
   --s3-bucket         S3 버킷 이름 (없으면 .env의 S3_BUCKET_NAME)
-  --s3-region         AWS 리전 (없으면 .env의 S3_REGION / 기본: ap-northeast-2)
+  --s3-region         AWS 리전 (없으면 .env의 S3_REGION)
   --delay             API 호출 간 대기 초 (기본: 0.5)
+  --force             이미 수집된 데이터도 재수집
 
 collect.py search
   --name              기업명 검색어
@@ -140,147 +253,76 @@ collect.py search
   --limit             최대 검색 결과 수 (기본: 20)
 ```
 
-**파일 저장 구조 예시:**
+---
+
+### 보조 스크립트
+
+기업 목록을 직접 생성하거나 관리할 때 사용하는 개별 스크립트입니다. `run_pipeline.py`를 사용하면 이 스크립트들이 내부적으로 자동 실행됩니다.
+
+| 스크립트 | 역할 |
+|---|---|
+| `f_make_A_input.py` | KRX 엑셀에서 A섹터(IT, Communication, Consumer) 정상 기업을 필터링하여 `data/input/A_companies.csv` 생성 |
+| `f_make_delisted_input.py` | 상폐 기업 중 A섹터 + 재무적 리스크 사유만 필터링하여 정상 기업과 합친 `data/input/A_companies_final.csv` 생성 |
+| `f_fetch_induty_codes.py` | DART API로 상폐 기업의 업종코드를 조회하여 `data/etc/delisted_induty_codes.csv` 캐시 생성 |
+| `f_split_companies.py` | 기업 목록 CSV를 여러 파일로 분할 (대규모 수집 시 활용) |
+
+---
+
+## 결과 데이터
+
+### 재무비율 CSV (`data/output/`)
 
 ```
 data/output/
-├── Health Care/
-│   ├── 052670_2010.csv     # 제일바이오 2010년 (Q1, H1, Q3, ANNUAL)
-│   ├── 052670_2024.csv     # 제일바이오 2024년
-│   └── 150840_2021.csv     # 인트로메딕 2021년
-├── Materials/
-│   ├── 019440_2022.csv     # 세아특수강 2022년
-│   └── 019440_2023.csv     # 세아특수강 2023년
 ├── Information Technology/
-│   └── 054630_2023.csv     # 에이디칩스 2023년
-├── Industrials/
-│   └── 024810_2023.csv     # 이화전기 2023년
+│   ├── 005930_2023.csv      # 삼성전자 2023년 (Q1, H1, Q3, ANNUAL)
+│   └── 035420_2023.csv      # NAVER 2023년
+├── Communication Services/
+│   └── 035720_2023.csv      # 카카오 2023년
+├── Consumer Discretionary/
+│   └── 090430_2023.csv
 └── ...
 ```
 
-> ⚠️ `gics_sector`가 지정되지 않은 기업은 `Unknown/` 디렉터리에 저장됩니다.
+**CSV 컬럼:**
 
----
-
-## 데이터 흐름
-
-```
-사용자 입력 (종목코드 + 연도)
-      │
-      ▼
-┌─────────────┐     ┌──────────────┐     ┌───────────────┐     ┌──────────┐
-│  collect.py  │ ──▶ │  collector.py │ ──▶ │ account_mapper│ ──▶ │  ratio   │
-│  (CLI 진입)  │     │  (수집 조율)  │     │ (계정명 매핑)  │     │calculator│
-└─────────────┘     └──────────────┘     └───────────────┘     └──────────┘
-                          │                                          │
-                          ▼                                          ▼
-                    ┌────────────┐                           결과 CSV 저장
-                    │  dart_api  │                        (data/output/*.csv)
-                    │ (API 호출)  │
-                    └────────────┘
-                          │
-                          ▼
-                    OpenDART 서버
-```
-
----
-
-## 파일별 상세 설명
-
-### `collect.py` — CLI 진입점
-
-사용자가 직접 실행하는 파일입니다. `argparse`로 CLI 인자를 파싱하고 두 개의 서브커맨드를 제공합니다:
-
-| 커맨드 | 함수 | 역할 |
-|---|---|---|
-| `collect` | `cmd_collect()` | 재무비율 데이터 수집 → CSV 저장 |
-| `search` | `cmd_search()` | DART 기업코드 검색 (종목코드/기업명) |
-
----
-
-### `src/dart_api.py` — OpenDART API 클라이언트
-
-OpenDART 서버와 직접 통신하는 유일한 모듈입니다.
-
-| 함수 | 역할 |
+| 컬럼 | 설명 |
 |---|---|
-| `get_api_key()` | `.env` 또는 환경변수에서 DART API 키 읽기 |
-| `_http_get()` | HTTP GET 요청 (SSL 인증서 처리 포함) |
-| `download_corp_codes()` | DART에서 전체 기업코드 XML 다운로드 |
-| `load_corp_codes()` | XML 파싱 → 기업 리스트 변환 |
-| `find_corp()` | 기업명/종목코드로 DART 고유코드 검색 |
-| `resolve_corp_code()` | 종목코드(6자리) → DART 고유코드(8자리) 변환 |
-| `fetch_financial_statements()` | **핵심** — 특정 기업·연도·분기의 전체 재무제표 JSON 조회 |
-| `fetch_all_quarters()` | 한 연도의 모든 분기 재무제표를 한 번에 가져오기 |
+| `stock_code` | 종목코드 |
+| `corp_name` | 기업명 |
+| `year` | 연도 |
+| `quarter` | 분기 (Q1/H1/Q3/ANNUAL) |
+| `label` | 정상(0) / 상폐(1) |
+| 총자산증가율 ~ 총자본투자효율 | 30개 재무비율 값 |
 
-**보고서 코드:**
+### 원본 재무제표 JSON (`data/raw/`)
 
-| 코드 | 분기 | REPORT_CODES 키 |
-|---|---|---|
-| 11013 | 1분기보고서 | `Q1` |
-| 11012 | 반기보고서 | `H1` |
-| 11014 | 3분기보고서 | `Q3` |
-| 11011 | 사업보고서 | `ANNUAL` |
+`--save-raw` 옵션 사용 시 DART 원본 응답을 보존합니다.
+
+```
+data/raw/
+├── 005930_2023_Q1_CFS.json
+├── 005930_2023_H1_CFS.json
+└── ...
+```
+
+### S3 저장 구조
+
+```
+s3://{bucket}/
+├── healthy/
+│   └── Information Technology/
+│       ├── 005930_2023_Q1.json
+│       └── ...
+├── delisted/
+│   └── Information Technology/
+│       ├── 054630_2020_Q1.json
+│       └── ...
+```
 
 ---
 
-### `src/account_mapper.py` — 계정과목명 매핑
-
-**문제:** OpenDART에서 반환하는 계정과목명(account_nm)이 기업마다 다릅니다.
-
-```
-A기업: "매출액"
-B기업: "수익(매출액)"
-C기업: "영업수익"
-→ 모두 같은 '매출(revenue)'이지만 이름이 다름
-```
-
-**해결:** 정규식 패턴 매칭으로 다양한 이름을 하나의 표준 키에 통합합니다.
-
-| 재무제표 | 표준 키 | 한글명 | 매칭 패턴 예시 |
-|---|---|---|---|
-| BS (재무상태표) | `total_assets` | 자산총계 | `자산\s*총계` |
-| BS | `current_assets` | 유동자산 | `유동\s*자산$` |
-| BS | `trade_receivables` | 매출채권 | `매출\s*채권\|단기매출채권` |
-| BS | `cash` | 현금및현금성자산 | `현금\s*(및\|과)\s*현금\s*성?\s*자산` |
-| IS (손익계산서) | `revenue` | 매출액 | `^매출액$\|^수익\s*\(매출액\)$\|^영업\s*수익$` |
-| IS | `net_income` | 당기순이익 | `당기\s*순이익\|당기순이익` |
-| CF (현금흐름표) | `depreciation` | 감가상각비 | `유형\s*자산\s*감가\s*상각비` |
-| ... | ... | ... | ... |
-
-**전체 표준 키 목록 (25개):**
-
-- **BS (17개):** `total_assets`, `current_assets`, `non_current_assets`, `tangible_assets`, `intangible_assets`, `trade_receivables`, `inventories`, `cash`, `total_liabilities`, `current_liabilities`, `short_term_borrowings`, `long_term_borrowings`, `bonds_payable`, `total_equity`, `paid_in_capital`, `retained_earnings`, `capital_surplus`
-- **IS (6개):** `revenue`, `cost_of_sales`, `gross_profit`, `operating_income`, `net_income`, `interest_expense`
-- **CF (2개):** `depreciation`, `amortization`
-
-`extract_standard_items()` 함수가 DART 원시 데이터를 받아서 표준 형태로 변환합니다:
-
-```
-입력: [{"account_nm": "자산총계", "thstrm_amount": "500,000,000", ...}, ...]
-출력: {"total_assets": {"thstrm": 500000000.0, "frmtrm": 480000000.0, ...}}
-```
-
-- `thstrm` = 당기(현재 기간) 금액
-- `frmtrm` = 전기(이전 기간) 금액
-- `bfefrmtrm` = 전전기 금액
-
----
-
-### `src/ratio_calculator.py` — 30개 재무비율 계산기
-
-표준 키로 변환된 재무 항목을 받아서 30개 비율을 계산합니다.
-
-**유틸리티 함수:**
-
-| 함수 | 역할 |
-|---|---|
-| `_get(items, key, period)` | 특정 항목·기간 값 추출 |
-| `_safe_div(a, b)` | 0 나눗셈·None 안전 처리 |
-| `_pct(a, b)` | `(a / b) * 100` 비율 계산 |
-| `_growth(curr, prev)` | `(당기 - 전기) / 전기 * 100` 증가율 |
-
-**30개 재무비율 목록:**
+## 30개 재무비율 목록
 
 | # | 카테고리 | 비율명 | 산출식 |
 |---|---|---|---|
@@ -291,7 +333,7 @@ C기업: "영업수익"
 | 5 | 성장성 | 영업이익증가율 | (당기영업이익 − 전기영업이익) / 전기영업이익 × 100 |
 | 6 | 수익성 | 매출액순이익률 | 순이익 / 매출액 × 100 |
 | 7 | 수익성 | 매출총이익률 | 매출총이익 / 매출액 × 100 |
-| 8 | 수익성 | 자기자본순이익률 | 순이익 / 자기자본 × 100 (ROE) |
+| 8 | 수익성 | 자기자본순이익률 (ROE) | 순이익 / 자기자본 × 100 |
 | 9 | 활동성 | 매출채권회전율 | 매출액 / 매출채권 |
 | 10 | 활동성 | 재고자산회전율 | 매출원가 / 재고자산 |
 | 11 | 활동성 | 총자본회전율 | 매출액 / 총자본 |
@@ -317,120 +359,42 @@ C기업: "영업수익"
 
 ---
 
+## 핵심 모듈 설명
+
+### `src/dart_api.py` — OpenDART API 클라이언트
+
+| 함수 | 역할 |
+|---|---|
+| `fetch_financial_statements()` | 특정 기업/연도/분기의 전체 재무제표 JSON 조회 |
+| `fetch_all_quarters()` | 한 연도의 모든 분기 재무제표를 한 번에 가져오기 |
+| `resolve_corp_code()` | 종목코드(6자리) → DART 고유코드(8자리) 변환 |
+| `find_corp()` | 기업명/종목코드로 DART 고유코드 검색 |
+
+### `src/account_mapper.py` — 계정과목명 매핑
+
+OpenDART에서 반환하는 계정과목명이 기업마다 다른 문제를 정규식 패턴 매칭으로 해결합니다.
+
+```
+A기업: "매출액"  /  B기업: "수익(매출액)"  /  C기업: "영업수익"
+→ 모두 'revenue'로 통합
+```
+
+### `src/ratio_calculator.py` — 30개 재무비율 계산기
+
+표준 키로 변환된 재무 항목을 받아서 30개 비율을 계산합니다.
+
 ### `src/collector.py` — 데이터 수집 오케스트레이터
 
-전체 수집 과정을 조율하는 핵심 모듈입니다.
-
-**`collect_single()`** — 기업 1개 × 분기 1개 처리:
-
-```
-종목코드 019440, 2020년, Q1
-   │
-   ├── 1) dart_api.fetch_financial_statements() → 원시 재무제표
-   ├── 2) account_mapper.extract_standard_items() → 표준 키 변환
-   └── 3) ratio_calculator.compute_all_ratios()  → 30개 비율 계산
-```
-
-**`collect_batch()`** — 여러 기업 × 여러 연도 × 여러 분기 배치 처리:
-
-핵심 동작:
-- **CFS → OFS 자동 폴백:** 연결재무제표(CFS)가 없는 기업은 자동으로 별도재무제표(OFS)로 재시도
-- **API 호출 제한 관리:** 호출 간 0.5초 대기 (OpenDART 분당 호출 제한 방지)
-- **진행률 표시:** `[3/16] 세아특수강 2020-Q3 ...` 형태로 진행 상황 출력
-- **CSV 저장:** UTF-8 BOM 포함 (엑셀에서 한글이 깨지지 않음)
-
----
-
-## 결과 CSV 형식
-
-| 컬럼 | 설명 |
-|---|---|
-| `stock_code` | 종목코드 |
-| `corp_name` | 기업명 |
-| `year` | 연도 |
-| `quarter` | 분기 (Q1/H1/Q3/ANNUAL) |
-| `label` | 정상(0) / 상폐(1) |
-| 총자산증가율 ~ 총자본투자효율 | 30개 재무비율 값 |
-
----
-
-## 원본 재무제표 저장 (--save-raw)
-
-`--save-raw` 옵션을 사용하면 OpenDART에서 받은 원본 재무제표 JSON을 `data/raw/` 폴더에 보존합니다.
-
-```bash
-python3 collect.py collect --stock-codes 019440 --years 2023 --save-raw
-```
-
-저장 경로: `data/raw/{종목코드}_{연도}_{분기}.json`
-
-원본 데이터를 보존하면 다음과 같은 장점이 있습니다:
-- **디버깅:** 비율 값이 이상할 때 원본 데이터를 확인하여 원인 파악 가능
-- **재현성:** 나중에 비율 산출 공식을 변경하더라도 API를 다시 호출하지 않고 재계산 가능
-- **확장성:** 현재 30개 비율 외에 추가 분석이 필요할 때 원본에서 바로 추출 가능
-- **학술 연구:** 데이터의 출처와 근거를 명확히 남길 수 있음
-
----
-
-## S3 업로드 (--upload-s3)
-
-`--upload-s3` 옵션을 사용하면 수집된 원본 재무제표 JSON을 AWS S3에 **GICS 섹터별 디렉터리**로 자동 업로드합니다.
-
-### 사전 준비
-
-1. `.env`에 S3 인증 정보 추가:
-   ```
-   S3_ACCESS_KEY=AKIA...
-   S3_PRIVATE_KEY=wJal...
-   S3_BUCKET_NAME=my-financial-data
-   S3_REGION=ap-northeast-2
-   ```
-2. boto3 설치: `pip3 install boto3`
-3. 기업 목록 CSV에 `gics_sector` 컬럼 추가
-
-### S3 저장 구조
-
-```
-s3://my-financial-data/
-├── Materials/
-│   ├── 019440_2023_Q1.json
-│   ├── 019440_2023_H1.json
-│   ├── 019440_2023_Q3.json
-│   └── 019440_2023_ANNUAL.json
-├── Information Technology/
-│   ├── 005930_2023_Q1.json
-│   └── ...
-└── Communication Services/
-    ├── 035720_2023_Q1.json
-    └── ...
-```
-
-### 동작 방식
-
-- S3에 지정한 버킷이 없으면 **자동 생성**
-- S3는 "디렉터리"가 아닌 key prefix로 동작하므로, 섹터 폴더도 **자동 생성**됨
-- 재무제표 데이터가 없는 분기(API 응답 빈 리스트)는 업로드하지 않음
-- `--upload-s3`와 `--save-raw`는 독립적으로 사용 가능 (동시 사용도 가능)
-
----
-
-## 기업 선정 가이드
-
-### 상폐 기업 (label=1)
-
-직접 찾는 것을 권장합니다. 이유:
-1. **상폐 사유 구분 필요:** 자진상폐, 합병, 재무적 상폐 등 사유가 다양하며, 예측 모델에는 **재무적 사유로 상폐된 기업**만 선별해야 의미가 있음
-2. **상폐 시점 파악:** 상폐 직전 N년간의 데이터가 필요하므로, 상폐 시점을 정확히 알아야 적절한 연도 범위를 설정 가능
-3. **참고 소스:** KRX KIND ([https://kind.krx.co.kr](https://kind.krx.co.kr)), 한국거래소 상장폐지종목 목록
-
-### 정상 기업 (label=0)
-
-비교 그룹(control group) 선정 시 **업종·규모 매칭**이 모델 품질에 큰 영향을 미칩니다.
+- CFS → OFS 자동 폴백 (연결재무제표 없으면 별도재무제표로 재시도)
+- API 호출 간 0.5초 대기 (분당 호출 제한 방지)
+- UTF-8 BOM 포함 CSV 저장 (엑셀 한글 깨짐 방지)
 
 ---
 
 ## 참고 사항
 
 - OpenDART API는 **분당 호출 횟수 제한**이 있습니다. `--delay` 옵션으로 호출 간격을 조절하세요.
-- 일부 기업은 연결재무제표(CFS)가 없을 수 있습니다. 이 경우 자동으로 별도재무제표(OFS)로 전환됩니다.
-- 비율 값이 `None`인 경우는 해당 계정과목이 재무제표에 존재하지 않거나, 0 나눗셈인 경우입니다.
+- 일부 기업은 연결재무제표(CFS)가 없을 수 있으며, 자동으로 별도재무제표(OFS)로 전환됩니다.
+- 비율 값이 `None`인 경우는 해당 계정과목이 재무제표에 존재하지 않거나 0 나눗셈인 경우입니다.
+- 수집 연도 범위: 정상 기업 2015~2025, 상폐 기업은 폐지 연도에 맞춰 자동 조정됩니다.
+- `data/etc/` 디렉터리는 `.gitignore`에 포함되어 있으므로 엑셀 파일은 각자 수동으로 배치해야 합니다.

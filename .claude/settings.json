@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls /Users/hann/Project/kwoss/data_collection/f_*.py)"
+    ]
+  }
+}
