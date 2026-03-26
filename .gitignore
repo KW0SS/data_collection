@@ -6,5 +6,6 @@ __pycache__/
 *.pyd
 *.zip
 *.log
+data/etc/
 automation/reports/
 prs/context.json

@@ -1,0 +1,131 @@
+{
+  "pr_type": "structure",
+  "base": "main",
+  "branch": "16-refactor-edit-automation-of-checking-pr",
+  "diff_stat": "10 files changed, 757 insertions(+), 41 deletions(-)",
+  "total_files": 10,
+  "commits": [
+    {
+      "hash": "fc1afa6",
+      "subject": "doc : for codex & claude dividing #16",
+      "author": "hann",
+      "date": "2026-03-24"
+    },
+    {
+      "hash": "59223a9",
+      "subject": "refactor : edit issue would be problem by using agent #16",
+      "author": "hann",
+      "date": "2026-03-24"
+    },
+    {
+      "hash": "d7c1589",
+      "subject": "doc : write AGENTS.md for automation using codex agent #16",
+      "author": "hann",
+      "date": "2026-03-24"
+    },
+    {
+      "hash": "476585e",
+      "subject": "doc : write CLAUDE.md for automation using agent #16",
+      "author": "hann",
+      "date": "2026-03-24"
+    },
+    {
+      "hash": "c177aa1",
+      "subject": "refactor : add AI in automation of PR writing #16",
+      "author": "hann",
+      "date": "2026-03-24"
+    },
+    {
+      "hash": "e741758",
+      "subject": "refactor : edit pr_pipeline.py for comparison another branch in local #16",
+      "author": "hann",
+      "date": "2026-03-23"
+    }
+  ],
+  "files": [
+    {
+      "status": "M",
+      "path": ".claude/settings.json",
+      "old_path": null
+    },
+    {
+      "status": "M",
+      "path": ".gitignore",
+      "old_path": null
+    },
+    {
+      "status": "A",
+      "path": "AGENTS.md",
+      "old_path": null
+    },
+    {
+      "status": "A",
+      "path": "CLAUDE.md",
+      "old_path": null
+    },
+    {
+      "status": "A",
+      "path": "agents/branch_compare.md",
+      "old_path": null
+    },
+    {
+      "status": "A",
+      "path": "agents/pr_create.md",
+      "old_path": null
+    },
+    {
+      "status": "A",
+      "path": "prs/16_structure-change.md",
+      "old_path": null
+    },
+    {
+      "status": "A",
+      "path": "prs/context_route1.json",
+      "old_path": null
+    },
+    {
+      "status": "M",
+      "path": "scripts/README_PR_PIPELINE.md",
+      "old_path": null
+    },
+    {
+      "status": "M",
+      "path": "scripts/pr_pipeline.py",
+      "old_path": null
+    }
+  ],
+  "checks": [
+    {
+      "name": "pr_type_alignment",
+      "status": "PASS",
+      "summary": "auto selected -> structure",
+      "details": []
+    },
+    {
+      "name": "automation_non_s3",
+      "status": "WARN",
+      "summary": "automation overall=WARN",
+      "details": []
+    },
+    {
+      "name": "collect_help",
+      "status": "PASS",
+      "summary": "python collect.py search --stock-code 019440",
+      "details": []
+    },
+    {
+      "name": "s3_uploader_v2_help",
+      "status": "PASS",
+      "summary": "                        로컬 로그 JSON을 S3에 업로드. 이 옵션만 있으면 raw data 업로드는 생략",
+      "details": []
+    },
+    {
+      "name": "py_compile",
+      "status": "PASS",
+      "summary": "ok",
+      "details": []
+    }
+  ],
+  "companies": [],
+  "output_added": {}
+}
