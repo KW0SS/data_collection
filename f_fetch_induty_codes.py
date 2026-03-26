@@ -1,21 +1,38 @@
 # 상폐 기업 업종코드 조회 → delisted_induty_codes.csv 저장
-import requests, os, time
+import requests, os, sys, time
 import xml.etree.ElementTree as ET
 import pandas as pd
+from pathlib import Path
 from dotenv import load_dotenv
 load_dotenv()
 
 api_key = os.getenv("DART_API_KEY")
+if not api_key:
+    print("DART_API_KEY가 설정되지 않았습니다. .env 파일을 확인하세요.")
+    sys.exit(1)
 
-tree = ET.parse("data/etc/corp_codes.xml")
+CORP_CODES_PATH = Path("data/etc/corp_codes.xml")
+DELISTED_XLSX   = Path("data/etc/상장폐지현황.xlsx")
+
+if not CORP_CODES_PATH.exists():
+    print(f"corp_codes.xml이 없습니다: {CORP_CODES_PATH}")
+    print("DART OpenAPI에서 고유번호 전체 목록을 다운로드하세요:")
+    print("  https://opendart.fss.or.kr/api/corpCode.xml?crtfc_key=<API_KEY>")
+    sys.exit(1)
+
+if not DELISTED_XLSX.exists():
+    print(f"상장폐지현황 파일이 없습니다: {DELISTED_XLSX}")
+    sys.exit(1)
+
+tree = ET.parse(str(CORP_CODES_PATH))
 root = tree.getroot()
 code_map = {
-    (item.findtext("stock_code") or "").strip(): 
+    (item.findtext("stock_code") or "").strip():
     (item.findtext("corp_code") or "").strip()
     for item in root.findall("list")
 }
 
-df = pd.read_excel("data/etc/상장폐지현황.xlsx", dtype={"종목코드": str})
+df = pd.read_excel(str(DELISTED_XLSX), dtype={"종목코드": str})
 df = df[df["종목코드"].str.match(r"^\d{6}$", na=False)]
 
 # SPAC 제거 강화
@@ -51,7 +68,15 @@ for i, (_, row) in enumerate(df.iterrows(), 1):
     time.sleep(0.3)
 
 df_result = pd.DataFrame(results)
-df_result.to_csv("data/etc/delisted_induty_codes.csv", index=False, encoding="utf-8-sig")
+if df_result.empty:
+    print("조회 결과가 없습니다. API 키와 corp_codes.xml을 확인하세요.")
+    sys.exit(1)
 
-print("\n앞 2자리 분포:")
-print(df_result["induty_code"].str[:2].value_counts().sort_index())
+OUTPUT_PATH = Path("data/etc/delisted_induty_codes.csv")
+OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+df_result.to_csv(str(OUTPUT_PATH), index=False, encoding="utf-8-sig")
+
+print(f"\n저장 완료: {OUTPUT_PATH} ({len(df_result)}건)")
+if "induty_code" in df_result.columns:
+    print("\n앞 2자리 분포:")
+    print(df_result["induty_code"].str[:2].value_counts().sort_index())

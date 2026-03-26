@@ -24,11 +24,11 @@ print("=== 상폐 기업 GICS 분포 ===")
 print(df_delisted["gics_sector"].value_counts())
 print()
 print("수집 명령어:")
-print(f"  python f_collect.py collect --companies {NORMAL_FILE} --save-raw")
-print(f"  python f_collect.py collect --companies {DELISTED_FILE} --save-raw")
+print(f"  python3 collect.py collect --companies {NORMAL_FILE} --save-raw")
+print(f"  python3 collect.py collect --companies {DELISTED_FILE} --save-raw")
 
 # # 정상 기업 수집
-# python f_collect.py collect --companies data/input/A_normal.csv --save-raw
+# python3 collect.py collect --companies data/input/A_normal.csv --save-raw
 
 # # 상폐 기업 수집
-# python f_collect.py collect --companies data/input/A_delisted.csv --save-raw
+# python3 collect.py collect --companies data/input/A_delisted.csv --save-raw

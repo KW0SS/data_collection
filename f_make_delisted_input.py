@@ -2,7 +2,6 @@
 # 사전 준비: f_fetch_induty_codes.py 실행 → data/etc/delisted_induty_codes.csv 생성
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import pandas as pd
 
@@ -14,6 +13,20 @@ OUTPUT_FILE  = Path("data/input/A_companies_final.csv")
 
 START_YEAR   = 2015
 LABEL        = 1   # 상폐 기업
+
+
+def _check_input_files() -> None:
+    """입력 파일 존재 여부를 검증. 단독 실행 시에만 호출."""
+    missing = [p for p in [INDUTY_FILE, DELISTED_FILE, NORMAL_FILE] if not p.exists()]
+    if missing:
+        print("필요한 입력 파일이 없습니다:")
+        for p in missing:
+            print(f"  - {p}")
+        if INDUTY_FILE in missing:
+            print("\n먼저 f_fetch_induty_codes.py를 실행하세요.")
+        if NORMAL_FILE in missing:
+            print("먼저 f_make_A_input.py를 실행하세요.")
+        sys.exit(1)
 
 # ── induty_code → GICS 매핑 ───────────────────────────────────────────
 # 앞자리 3자리 우선 매핑, 없으면 2자리로 fallback
@@ -94,7 +107,52 @@ def map_gics_by_code(code: str):
     return None
 
 
+# ── 재무적 리스크 필터링 ──────────────────────────────────────────
+FINANCIAL_RISK_KEYWORDS = [
+    "감사의견거절", "감사의견 거절",
+    "감사범위제한", "감사범위 제한",
+    "감사의견 부적정", "감사의견부적정",
+    "자본전액잠식", "자본잠식률",
+    "최종부도", "부도",
+    "영업손실",
+    "법인세비용차감전계속사업손실", "법인세차감전계속사업손실",
+    "매출액 미달", "매출액미달",
+    "시가총액",
+    "계속기업",
+    "회생절차",
+    "파산",
+    "기업의 계속성",
+]
+
+EXCLUDE_REASON_KEYWORDS = [
+    "피흡수합병", "합병",
+    "유가증권시장 상장", "증권거래소 상장", "한국증권거래소 상장",
+    "자진등록취소", "상장폐지신청", "상장폐지 신청", "자진 등록취소",
+    "등록법인의 취소신청",
+    "주식분산기준", "주식분산기분",
+    "주된영업의 양도", "주된 영업의 양도",
+    "증권투자회사법", "간접투자자산운용업법",
+    "불성실공시",
+    "거래실적부진",
+    "액면가액일정비율", "액면가액 일정비율",
+    "타법인의 완전자회사",
+    "주식양도 제한",
+    "존립기간의 만료",
+]
+
+
+def is_financial_risk(reason):
+    """폐지사유가 재무적 리스크에 해당하는지 판별."""
+    if pd.isna(reason):
+        return False
+    if any(k in reason for k in EXCLUDE_REASON_KEYWORDS):
+        return False
+    return any(k in reason for k in FINANCIAL_RISK_KEYWORDS)
+
+
 def main():
+    _check_input_files()
+
     # 1) 업종코드 파일 로드
     df_induty = pd.read_csv(INDUTY_FILE, dtype={"종목코드": str, "induty_code": str})
     print(f"업종코드 보유 기업: {len(df_induty)}개")
@@ -113,47 +171,6 @@ def main():
     print(f"SPAC 제거 후: {len(df)}개")
 
     # 4-1) 재무적 리스크 사유만 필터링
-    FINANCIAL_RISK_KEYWORDS = [
-        "감사의견거절", "감사의견 거절",
-        "감사범위제한", "감사범위 제한",
-        "감사의견 부적정", "감사의견부적정",
-        "자본전액잠식", "자본잠식률",
-        "최종부도", "부도",
-        "영업손실",
-        "법인세비용차감전계속사업손실", "법인세차감전계속사업손실",
-        "매출액 미달", "매출액미달",
-        "시가총액",
-        "계속기업",
-        "회생절차",
-        "파산",
-        "기업의 계속성",  # 종합적 판단이지만 재무 위기 포함
-    ]
-
-    EXCLUDE_REASON_KEYWORDS = [
-        "피흡수합병", "합병",
-        "유가증권시장 상장", "증권거래소 상장", "한국증권거래소 상장",
-        "자진등록취소", "상장폐지신청", "상장폐지 신청", "자진 등록취소",
-        "등록법인의 취소신청",
-        "주식분산기준", "주식분산기분",
-        "주된영업의 양도", "주된 영업의 양도",
-        "증권투자회사법", "간접투자자산운용업법",
-        "불성실공시",
-        "거래실적부진",
-        "액면가액일정비율", "액면가액 일정비율",
-        "타법인의 완전자회사",
-        "주식양도 제한",
-        "존립기간의 만료",
-    ]
-
-    def is_financial_risk(reason):
-        if pd.isna(reason):
-            return False
-        # 명시적 제외 먼저
-        if any(k in reason for k in EXCLUDE_REASON_KEYWORDS):
-            return False
-        # 재무적 리스크 키워드 포함
-        return any(k in reason for k in FINANCIAL_RISK_KEYWORDS)
-
     before = len(df)
     df = df[df["폐지사유"].apply(is_financial_risk)]
     print(f"재무적 리스크 필터링 후: {len(df)}개 (제거: {before - len(df)}개)")
@@ -174,12 +191,22 @@ def main():
         df["폐지일자"], errors="coerce"
     ).dt.year.fillna(2025).astype(int)
 
+    # 7-1) start_year > end_year 방지: 2015년 이전 폐지 기업은 start_year를 end_year에 맞춤
+    df["start_year_raw"] = START_YEAR
+    df["start_year_raw"] = df.apply(
+        lambda r: min(START_YEAR, r["end_year"]) if r["end_year"] < START_YEAR else START_YEAR,
+        axis=1,
+    )
+    invalid_count = (df["end_year"] < START_YEAR).sum()
+    if invalid_count > 0:
+        print(f"  ⚠️ {START_YEAR}년 이전 폐지 기업 {invalid_count}건 → start_year 조정됨")
+
     # 8) 컬럼 정리
     df = df.copy()
     df["stock_code"] = df["종목코드"]
     df["corp_name"]  = df["회사명"]
     df["label"]      = LABEL
-    df["start_year"] = START_YEAR
+    df["start_year"] = df["start_year_raw"]
 
     df_del_final = df[["stock_code", "corp_name", "label", "gics_sector", "start_year", "end_year"]]
 
