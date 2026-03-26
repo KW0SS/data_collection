@@ -16,7 +16,7 @@ cp .env.example .env   # 또는 직접 생성
 # 3. 엑셀 파일 배치 (아래 '사전 준비' 참고)
 
 # 4. 통합 파이프라인 실행
-python3 run_pipeline.py --status normal --sectors "Information Technology" --member hann --skip-s3
+python3 run_pipeline.py --status normal --sectors "Materials" --member hann --skip-s3
 ```
 
 ---
@@ -33,8 +33,8 @@ data_collection/
 │   ├── ratio_calculator.py            # 30개 재무비율 계산기
 │   ├── collector.py                   # 데이터 수집 오케스트레이터
 │   └── s3_uploader.py                 # S3 업로드 모듈 (GICS 섹터별)
-├── f_make_A_input.py                  # 정상 기업 목록 생성 (KRX → A섹터 필터링)
-├── f_make_delisted_input.py           # 상폐 기업 목록 생성 (업종코드 → GICS 매핑)
+├── f_make_A_input.py                  # (보조) 정상 기업 목록 생성 스크립트
+├── f_make_delisted_input.py           # (보조) 상폐 기업 목록 생성 스크립트
 ├── f_fetch_induty_codes.py            # 상폐 기업 업종코드 조회 (DART API)
 ├── f_split_companies.py               # 기업 목록 분할 도구
 ├── data/
@@ -100,19 +100,19 @@ S3_REGION=ap-northeast-2
 엑셀 파일만 배치하면 **기업 목록 생성 → 재무제표 수집 → S3 업로드**를 한 번에 수행합니다.
 
 ```bash
-# 정상 기업만, IT 섹터
+# 정상 기업만, Materials 섹터
 python3 run_pipeline.py --status normal \
-    --sectors "Information Technology" \
+    --sectors "Materials" \
     --member hann
 
-# 상폐 기업만, Consumer Discretionary 섹터
+# 상폐 기업만, Health Care 섹터
 python3 run_pipeline.py --status delisted \
-    --sectors "Consumer Discretionary" \
+    --sectors "Health Care" \
     --member hann
 
 # 정상 + 상폐 모두, 복수 섹터
 python3 run_pipeline.py --status all \
-    --sectors "Information Technology" "Communication Services" \
+    --sectors "Information Technology" "Consumer Discretionary" "Materials" \
     --member hann
 
 # 전체 섹터 (--sectors 미지정)
@@ -120,17 +120,17 @@ python3 run_pipeline.py --status all --member hann
 
 # S3 업로드 건너뛰기 (수집만)
 python3 run_pipeline.py --status normal \
-    --sectors "Information Technology" \
+    --sectors "Materials" \
     --member hann --skip-s3
 
 # dry-run: 수집 대상 기업 목록만 확인
 python3 run_pipeline.py --status delisted \
-    --sectors "Information Technology" \
+    --sectors "Materials" \
     --member hann --dry-run
 
 # 이미 수집된 데이터도 재수집
 python3 run_pipeline.py --status normal \
-    --sectors "Information Technology" \
+    --sectors "Materials" \
     --member hann --force
 ```
 
@@ -139,7 +139,7 @@ python3 run_pipeline.py --status normal \
 | 옵션 | 필수 | 설명 |
 |---|---|---|
 | `--status` | O | 수집 대상: `normal`(정상), `delisted`(상폐), `all`(전체) |
-| `--sectors` | X | GICS 섹터 목록 (미지정 시 전체 섹터) |
+| `--sectors` | X | GICS 섹터 목록 (미지정 시 전체 섹터). 대소문자/별칭 허용 (`materials`, `health care` 등) |
 | `--member` | O | 작업자 이름 (S3 로그 기록용) |
 | `--skip-s3` | X | S3 업로드 건너뛰기 |
 | `--force` | X | 이미 수집된 데이터도 재수집 |
@@ -147,11 +147,17 @@ python3 run_pipeline.py --status normal \
 
 #### 지원 GICS 섹터
 
-| 섹터 | 포함 업종 |
-|---|---|
-| `Information Technology` | 반도체, 소프트웨어, 컴퓨터, 시스템통합, 정보서비스, 통신장비, 영상음향기기 등 |
-| `Communication Services` | 전기통신, 방송, 영화, 광고, 출판, 엔터테인먼트, 게임 등 |
-| `Consumer Discretionary` | 의복, 의류, 화장품, 가구, 숙박, 음식점, 소매 등 |
+- `Information Technology`
+- `Communication Services`
+- `Consumer Discretionary`
+- `Consumer Staples`
+- `Health Care`
+- `Industrials`
+- `Materials`
+- `Energy`
+- `Utilities`
+- `Financials`
+- `Real Estate`
 
 #### 파이프라인 동작 흐름
 
@@ -160,8 +166,8 @@ python3 run_pipeline.py --status normal \
       │
       ▼
 [1/3] 기업 목록 생성
-      ├── 정상 기업: KRX 엑셀 → 업종 필터링 → GICS 매핑
-      └── 상폐 기업: 업종코드 조회 → GICS 매핑 → 재무적 리스크 필터링
+      ├── 정상 기업: KRX 엑셀 → 업종 기반 범용 GICS 매핑
+      └── 상폐 기업: 업종코드 캐시/조회 → GICS 매핑 → 재무적 리스크 필터링
       │
       ▼
 [2/3] 재무제표 수집 (collect.py)
@@ -257,12 +263,13 @@ collect.py search
 
 ### 보조 스크립트
 
-기업 목록을 직접 생성하거나 관리할 때 사용하는 개별 스크립트입니다. `run_pipeline.py`를 사용하면 이 스크립트들이 내부적으로 자동 실행됩니다.
+기업 목록을 직접 생성하거나 관리할 때 사용하는 개별 스크립트입니다.  
+`run_pipeline.py`는 이 중 `f_fetch_induty_codes.py`만 캐시 생성 시 호출하며, 나머지는 필요 시 수동 실행합니다.
 
 | 스크립트 | 역할 |
 |---|---|
-| `f_make_A_input.py` | KRX 엑셀에서 A섹터(IT, Communication, Consumer) 정상 기업을 필터링하여 `data/input/A_companies.csv` 생성 |
-| `f_make_delisted_input.py` | 상폐 기업 중 A섹터 + 재무적 리스크 사유만 필터링하여 정상 기업과 합친 `data/input/A_companies_final.csv` 생성 |
+| `f_make_A_input.py` | KRX 엑셀에서 정상 기업 목록 CSV를 생성하는 보조 스크립트 |
+| `f_make_delisted_input.py` | 상폐 기업 목록 CSV를 생성하는 보조 스크립트 |
 | `f_fetch_induty_codes.py` | DART API로 상폐 기업의 업종코드를 조회하여 `data/etc/delisted_induty_codes.csv` 캐시 생성 |
 | `f_split_companies.py` | 기업 목록 CSV를 여러 파일로 분할 (대규모 수집 시 활용) |
 
