@@ -1,0 +1,2 @@
+"""Automation checks package."""
+

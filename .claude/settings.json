@@ -2,6 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(ls /Users/hann/Project/kwoss/data_collection/f_*.py)"
+      "Bash(rm logs/20260320_15550*_test.json logs/20260320_1608*_test.json)",
+      "Bash(rm -rf /tmp/s3_test)",
+      "Read(//Users/hann/Project/kwoss/**)",
+      "Bash(echo $OPENAI_API_KEY)",
+      "Bash(echo \"exit: $?\")"
     ]
   }
 }
