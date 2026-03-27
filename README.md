@@ -95,6 +95,17 @@ S3_REGION=ap-northeast-2
 
 ## 사용법
 
+### 추천 실행 순서 (운영 가이드)
+
+| 단계 | 목적 | 로컬 수집 | S3(버킷) 업로드 | 권장 명령어 |
+|---|---|---|---|---|
+| 1) 리스트 확인 | 대상 기업만 점검 (수집 실행 X) | X | X | `python3 run_pipeline.py --status normal --sectors "Materials" --member hann --dry-run` |
+| 2) 단일 테스트 | 1개 종목으로 수집/업로드 동작 확인 | O | O | `python3 collect.py collect --stock-codes 019440 --years 2023 --quarters ANNUAL --save-raw --upload-s3` |
+| 3) 본 수집 실행 | 리스트 기준 대량 수집/업로드 | O | O | `python3 run_pipeline.py --status normal --sectors "Materials" --member hann` |
+
+> 단계 2에서 `019440`은 실제 존재하는 테스트 종목코드로 교체하세요.
+> 단계 3에서 `--sectors`는 원하는 섹터명으로 바꿔 실행하면 됩니다.
+
 ### 방법 1: 통합 파이프라인 (`run_pipeline.py`) — 권장
 
 엑셀 파일만 배치하면 **기업 목록 생성 → 재무제표 수집 → S3 업로드**를 한 번에 수행합니다.
