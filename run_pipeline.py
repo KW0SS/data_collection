@@ -34,6 +34,16 @@ python3 run_pipeline.py --status normal \
 python3 run_pipeline.py --status delisted \
     --sectors "Information Technology" \
     --member hann --dry-run
+
+# 2015년 이전 데이터도 포함 (dart-fss 사용)
+python3 run_pipeline.py --status delisted \
+    --sectors "Materials" \
+    --member hann --start-year 2002 --skip-s3
+
+# 정상 기업 2010~2025 전체 수집
+python3 run_pipeline.py --status normal \
+    --sectors "Information Technology" \
+    --member hann --start-year 2010 --end-year 2025
 """
 from __future__ import annotations
 
@@ -60,6 +70,7 @@ PIPELINE_CSV = INPUT_DIR / "pipeline_companies.csv"
 COLUMNS = ["stock_code", "corp_name", "label", "gics_sector", "start_year", "end_year"]
 DEFAULT_START_YEAR = 2015
 DEFAULT_END_YEAR = 2025
+LEGACY_CUTOFF_YEAR = 2015  # 이 연도 미만은 dart-fss 기반 legacy 수집
 
 VALID_GICS_SECTORS = [
     "Information Technology",
@@ -349,7 +360,11 @@ def _is_financial_risk(reason: str | float | None) -> bool:
 
 
 # ── 정상 기업 목록 생성 ──────────────────────────────────────────
-def _build_normal_companies(sectors: list[str] | None) -> pd.DataFrame:
+def _build_normal_companies(
+    sectors: list[str] | None,
+    start_year: int = DEFAULT_START_YEAR,
+    end_year: int = DEFAULT_END_YEAR,
+) -> pd.DataFrame:
     """KRX 엑셀에서 정상 기업 목록을 생성 (범용 섹터 매핑)."""
     if not KRX_XLSX.exists():
         print(f"KRX 전종목 파일이 없습니다: {KRX_XLSX}")
@@ -365,8 +380,8 @@ def _build_normal_companies(sectors: list[str] | None) -> pd.DataFrame:
     df = df[df["stock_code"].str.match(r"^\d{6}$")]
 
     df["label"] = 0
-    df["start_year"] = DEFAULT_START_YEAR
-    df["end_year"] = DEFAULT_END_YEAR
+    df["start_year"] = start_year
+    df["end_year"] = end_year
 
     df = df[COLUMNS]
 
@@ -396,7 +411,10 @@ def _ensure_induty_cache() -> None:
         sys.exit(1)
 
 
-def _build_delisted_companies(sectors: list[str] | None) -> pd.DataFrame:
+def _build_delisted_companies(
+    sectors: list[str] | None,
+    start_year: int = DEFAULT_START_YEAR,
+) -> pd.DataFrame:
     """상폐 기업 목록을 생성 (범용 섹터 매핑)."""
     if not DELISTED_XLSX.exists():
         print(f"상장폐지현황 파일이 없습니다: {DELISTED_XLSX}")
@@ -425,14 +443,16 @@ def _build_delisted_companies(sectors: list[str] | None) -> pd.DataFrame:
     df["gics_sector"] = df["induty_code"].apply(_map_gics_from_induty_code)
     df = df[df["gics_sector"].notna()]
 
-    # end_year
+    # end_year = 폐지 연도
     df["end_year"] = pd.to_datetime(
         df["폐지일자"], errors="coerce"
     ).dt.year.fillna(2025).astype(int)
 
-    # start_year (2015 이전 폐지 기업 보정)
+    # start_year: 사용자 지정 start_year와 end_year 중 작은 값
+    # 예: start_year=2002, 폐지연도=2010 → 2002~2010 수집
+    # 예: start_year=2002, 폐지연도=2000 → 2000~2000 수집
     df["start_year"] = df["end_year"].apply(
-        lambda ey: min(DEFAULT_START_YEAR, ey) if ey < DEFAULT_START_YEAR else DEFAULT_START_YEAR
+        lambda ey: min(start_year, ey)
     )
 
     df = df.copy()
@@ -483,6 +503,19 @@ def main() -> int:
         help="이미 수집된 데이터도 재수집 + S3 덮어쓰기",
     )
     parser.add_argument(
+        "--start-year",
+        type=int,
+        default=None,
+        help=f"수집 시작 연도 (기본: {DEFAULT_START_YEAR}). "
+             f"{LEGACY_CUTOFF_YEAR} 미만이면 dart-fss로 legacy 수집 자동 전환",
+    )
+    parser.add_argument(
+        "--end-year",
+        type=int,
+        default=None,
+        help=f"수집 종료 연도 (기본: {DEFAULT_END_YEAR})",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="수집 대상 기업 목록만 출력하고 종료",
@@ -494,22 +527,31 @@ def main() -> int:
         print(str(e))
         return 1
 
+    # ── 연도 범위 결정 ──
+    start_year = args.start_year if args.start_year is not None else DEFAULT_START_YEAR
+    end_year = args.end_year if args.end_year is not None else DEFAULT_END_YEAR
+    has_legacy = start_year < LEGACY_CUTOFF_YEAR
+    step_total = 4  # 기업목록 → 수집 → 누락재수집 → S3
+
     # ── 1) 기업 목록 생성 ──
     print("=" * 60)
-    print("[1/3] 기업 목록 생성")
+    print(f"[1/{step_total}] 기업 목록 생성")
     print("=" * 60)
+    print(f"  수집 범위: {start_year}~{end_year}")
+    if has_legacy:
+        print(f"  {LEGACY_CUTOFF_YEAR} 이전은 dart-fss 사용")
 
     frames: list[pd.DataFrame] = []
 
     if args.status in ("normal", "all"):
         print("\n정상 기업 목록 생성 중...")
-        df_normal = _build_normal_companies(args.sectors)
+        df_normal = _build_normal_companies(args.sectors, start_year, end_year)
         print(f"  정상 기업: {len(df_normal)}개")
         frames.append(df_normal)
 
     if args.status in ("delisted", "all"):
         print("\n상폐 기업 목록 생성 중...")
-        df_delisted = _build_delisted_companies(args.sectors)
+        df_delisted = _build_delisted_companies(args.sectors, start_year)
         print(f"  상폐 기업: {len(df_delisted)}개")
         frames.append(df_delisted)
 
@@ -527,6 +569,11 @@ def main() -> int:
         delisted_cnt = (group["label"] == 1).sum()
         print(f"  {sector}: 정상 {normal_cnt} / 상폐 {delisted_cnt}")
 
+    # legacy 대상 기업 수
+    legacy_count = (df_all["start_year"] < LEGACY_CUTOFF_YEAR).sum()
+    if legacy_count > 0:
+        print(f"\n  {LEGACY_CUTOFF_YEAR}년 이전 수집 대상: {legacy_count}개 기업 (dart-fss)")
+
     if args.dry_run:
         print(f"\n[dry-run] 기업 목록 미리보기 (상위 20개):")
         print(df_all.head(20).to_string(index=False))
@@ -539,7 +586,7 @@ def main() -> int:
 
     # ── 2) 재무제표 수집 ──
     print("\n" + "=" * 60)
-    print("[2/3] 재무제표 수집 (collect.py)")
+    print(f"[2/{step_total}] 재무제표 수집 (collect.py)")
     print("=" * 60)
 
     collect_cmd = [
@@ -553,34 +600,53 @@ def main() -> int:
     result = _run(collect_cmd, check=False)
     if result.returncode != 0:
         print("\n재무제표 수집 중 오류 발생. 로그를 확인하세요.")
-        # 수집 실패해도 S3 업로드는 시도 (이미 수집된 데이터가 있을 수 있음)
+        # 수집 실패해도 다음 단계는 시도 (이미 수집된 데이터가 있을 수 있음)
 
-    # ── 3) S3 업로드 ──
+    # ── 3) 누락 검증 및 재수집 ──
+    print("\n" + "=" * 60)
+    print(f"[3/{step_total}] 누락 데이터 검증 및 재수집")
+    print("=" * 60)
+
+    retry_cmd = [
+        "python3", "collect.py", "retry",
+        "--save-raw",
+    ]
+
+    result = _run(retry_cmd, check=False)
+    if result.returncode != 0:
+        print("\n누락 재수집 중 오류 발생. 로그를 확인하세요.")
+
+    # ── S3 업로드 ──
+    s3_step = step_total
     if args.skip_s3:
         print("\n[skip] S3 업로드 건너뜀 (--skip-s3)")
     else:
         print("\n" + "=" * 60)
-        print("[3/3] S3 업로드 (s3_uploader_v2)")
+        print(f"[{s3_step}/{step_total}] S3 업로드")
         print("=" * 60)
 
-        # 섹터별로 업로드
+        # collect.py의 --upload-s3 로 업로드 (수집과 동시 처리도 가능)
         upload_sectors = args.sectors or df_all["gics_sector"].unique().tolist()
         for sector in upload_sectors:
             print(f"\n  섹터: {sector}")
             s3_cmd = [
-                "python3", "-m", "src.s3_uploader_v2",
-                "--member", args.member,
-                "--sector", sector,
+                "python3", "collect.py", "collect",
+                "--companies", str(PIPELINE_CSV),
+                "--upload-s3",
             ]
             if args.force:
                 s3_cmd.append("--force")
             _run(s3_cmd, check=False)
+            break  # collect_batch가 전체 기업을 한 번에 처리하므로 한 번만 실행
 
     # ── 완료 ──
     print("\n" + "=" * 60)
     print("파이프라인 완료")
     print("=" * 60)
     print(f"  대상: {args.status} ({len(df_all)}개 기업)")
+    print(f"  수집 범위: {start_year}~{end_year}")
+    if has_legacy:
+        print(f"  Legacy: {start_year}~{LEGACY_CUTOFF_YEAR - 1} (dart-fss)")
     if args.sectors:
         print(f"  섹터: {', '.join(args.sectors)}")
     print(f"  CSV: data/output/{{sector}}/{{ticker}}_{{year}}.csv")

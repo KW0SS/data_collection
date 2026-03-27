@@ -583,21 +583,39 @@ def collect_batch(
     return saved_files
 
 
-# ── 2015년 이전 누락 기업 목록 생성 ────────────────────────────
+# ── 누락 기업 목록 생성 ──────────────────────────────────────────
+MISSING_CSV = INPUT_DIR / "companies_missing.csv"
 MISSING_LEGACY_CSV = INPUT_DIR / "companies_missing_legacy.csv"
 
 
-def generate_missing_legacy_csv(
+def _scan_actual_files(save_dir: Path) -> dict[str, set[int]]:
+    """output 디렉터리에서 실제 존재하는 CSV 파일을 스캔.
+
+    Returns:
+        {stock_code: {2015, 2016, ...}} 형태의 딕셔너리
+    """
+    actual: dict[str, set[int]] = {}
+    for csv_file in save_dir.rglob("*.csv"):
+        parts = csv_file.stem.split("_")
+        if len(parts) == 2:
+            sc, yr = parts
+            try:
+                actual.setdefault(sc, set()).add(int(yr))
+            except ValueError:
+                continue
+    return actual
+
+
+def generate_missing_csv(
     output_dir: Path | None = None,
 ) -> Path:
     """companies_collected.csv와 output 디렉터리를 비교하여
-    2015년 이전 누락 연도가 있는 기업만 추출한 CSV를 생성.
+    전체 누락 연도(legacy + 2015 이후 모두)가 있는 기업의 CSV를 생성.
 
-    생성 파일: data/input/companies_missing_legacy.csv
-    컬럼: stock_code, corp_name, label, gics_sector, start_year, end_year
+    누락 연도가 연속되지 않을 수 있으므로(예: 2011-2014 + 2023-2025),
+    기업별로 여러 행을 생성하여 연속 구간별로 분리합니다.
 
-    start_year/end_year는 누락 구간의 시작/종료 연도로 설정됩니다.
-    (2015년 이전만 대상)
+    생성 파일: data/input/companies_missing.csv
 
     Returns:
         생성된 CSV 파일 경로
@@ -615,16 +633,113 @@ def generate_missing_legacy_csv(
         for row in csv.DictReader(f):
             companies.append({k.strip(): (v or "").strip() for k, v in row.items()})
 
-    # output 디렉터리에서 실제 존재하는 파일 스캔
-    actual_files: dict[str, set[int]] = {}
-    for csv_file in save_dir.rglob("*.csv"):
-        parts = csv_file.stem.split("_")
-        if len(parts) == 2:
-            sc, yr = parts
-            try:
-                actual_files.setdefault(sc, set()).add(int(yr))
-            except ValueError:
-                continue
+    actual_files = _scan_actual_files(save_dir)
+
+    # 누락 기업 추출 (전체 연도)
+    missing_entries: list[dict[str, str]] = []
+    for comp in companies:
+        sc = comp.get("stock_code", "").strip()
+        sy = comp.get("start_year", "").strip()
+        ey = comp.get("end_year", "").strip()
+        if not sc or not sy or not ey:
+            continue
+
+        start = int(sy)
+        end = int(ey)
+        if start > end:
+            continue
+
+        expected = set(range(start, end + 1))
+        actual = actual_files.get(sc, set())
+        missing_years = sorted(expected - actual)
+
+        if not missing_years:
+            continue
+
+        # 연속 구간으로 분리 (예: [2011,2012,2013,2023,2024] → [(2011,2013), (2023,2024)])
+        ranges: list[tuple[int, int]] = []
+        range_start = missing_years[0]
+        prev = missing_years[0]
+        for yr in missing_years[1:]:
+            if yr != prev + 1:
+                ranges.append((range_start, prev))
+                range_start = yr
+            prev = yr
+        ranges.append((range_start, prev))
+
+        for rs, re in ranges:
+            missing_entries.append({
+                "stock_code": sc,
+                "corp_name": comp.get("corp_name", ""),
+                "label": comp.get("label", ""),
+                "gics_sector": comp.get("gics_sector", "Unknown"),
+                "start_year": str(rs),
+                "end_year": str(re),
+            })
+
+    # CSV 저장
+    INPUT_DIR.mkdir(parents=True, exist_ok=True)
+    with open(MISSING_CSV, "w", newline="", encoding="utf-8-sig") as f:
+        writer = csv.DictWriter(f, fieldnames=COLLECTED_FIELDNAMES)
+        writer.writeheader()
+        writer.writerows(missing_entries)
+
+    total_years = sum(
+        int(e["end_year"]) - int(e["start_year"]) + 1 for e in missing_entries
+    )
+
+    # legacy / modern 구분 집계
+    legacy_years = sum(
+        min(int(e["end_year"]), LEGACY_CUTOFF_YEAR - 1) - int(e["start_year"]) + 1
+        for e in missing_entries
+        if int(e["start_year"]) < LEGACY_CUTOFF_YEAR
+    )
+    modern_years = total_years - legacy_years
+
+    print(
+        f"📋 누락 목록 생성: {MISSING_CSV}\n"
+        f"   {len(missing_entries)}개 구간, 총 {total_years}개 연도"
+        f" (legacy: {legacy_years}, modern: {modern_years})",
+        file=sys.stderr,
+    )
+
+    # 상세 출력
+    for entry in missing_entries:
+        is_legacy = int(entry["start_year"]) < LEGACY_CUTOFF_YEAR
+        tag = "[legacy]" if is_legacy else "[modern]"
+        print(
+            f"  {tag:9} {entry['stock_code']} {entry['corp_name']:<14} "
+            f"{entry['gics_sector']:<25} {entry['start_year']}-{entry['end_year']}",
+            file=sys.stderr,
+        )
+
+    return MISSING_CSV
+
+
+def generate_missing_legacy_csv(
+    output_dir: Path | None = None,
+) -> Path:
+    """companies_collected.csv와 output 디렉터리를 비교하여
+    2015년 이전 누락 연도가 있는 기업만 추출한 CSV를 생성.
+
+    생성 파일: data/input/companies_missing_legacy.csv
+
+    Returns:
+        생성된 CSV 파일 경로
+    """
+    if not COLLECTED_CSV.exists():
+        raise FileNotFoundError(
+            f"{COLLECTED_CSV}가 없습니다. 먼저 collect 명령으로 데이터를 수집하세요."
+        )
+
+    save_dir = output_dir if output_dir else OUTPUT_DIR
+
+    companies: list[dict[str, str]] = []
+    with open(COLLECTED_CSV, newline="", encoding="utf-8-sig") as f:
+        for row in csv.DictReader(f):
+            companies.append({k.strip(): (v or "").strip() for k, v in row.items()})
+
+    actual_files = _scan_actual_files(save_dir)
 
     # 누락 기업 추출 (2015년 이전만)
     missing_entries: list[dict[str, str]] = []
@@ -636,7 +751,7 @@ def generate_missing_legacy_csv(
             continue
 
         start = int(sy)
-        end = min(int(ey), LEGACY_CUTOFF_YEAR - 1)  # 2014년까지만
+        end = min(int(ey), LEGACY_CUTOFF_YEAR - 1)
         if start > end:
             continue
 
@@ -656,7 +771,6 @@ def generate_missing_legacy_csv(
             "end_year": str(missing_years[-1]),
         })
 
-    # CSV 저장
     INPUT_DIR.mkdir(parents=True, exist_ok=True)
     with open(MISSING_LEGACY_CSV, "w", newline="", encoding="utf-8-sig") as f:
         writer = csv.DictWriter(f, fieldnames=COLLECTED_FIELDNAMES)
@@ -667,12 +781,11 @@ def generate_missing_legacy_csv(
         int(e["end_year"]) - int(e["start_year"]) + 1 for e in missing_entries
     )
     print(
-        f"📋 누락 기업 목록 생성: {MISSING_LEGACY_CSV}\n"
+        f"📋 누락 기업 목록 생성 (legacy): {MISSING_LEGACY_CSV}\n"
         f"   {len(missing_entries)}개 기업, 총 {total_years}개 연도",
         file=sys.stderr,
     )
 
-    # 상세 출력
     for entry in missing_entries:
         print(
             f"  {entry['stock_code']} {entry['corp_name']:<14} "

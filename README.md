@@ -132,7 +132,21 @@ python3 run_pipeline.py --status delisted \
 python3 run_pipeline.py --status normal \
     --sectors "Materials" \
     --member hann --force
+
+# 2015년 이전 데이터 포함 (dart-fss 자동 사용)
+python3 run_pipeline.py --status delisted \
+    --sectors "Materials" \
+    --member hann --start-year 2002 --skip-s3
+
+# 정상 기업 2010~2025 전체 수집
+python3 run_pipeline.py --status normal \
+    --sectors "Information Technology" \
+    --member hann --start-year 2010 --end-year 2025
 ```
+
+> **2015년 이전 데이터:** DART OpenAPI(`fnlttSinglAcntAll`)는 2015년 이후만 지원합니다.
+> `--start-year`를 2015 미만으로 지정하면 해당 구간은 `dart-fss` 라이브러리를 통해
+> XBRL/HTML 원문에서 사업보고서(ANNUAL) 단위로 자동 수집됩니다.
 
 #### `run_pipeline.py` CLI 옵션
 
@@ -141,6 +155,8 @@ python3 run_pipeline.py --status normal \
 | `--status` | O | 수집 대상: `normal`(정상), `delisted`(상폐), `all`(전체) |
 | `--sectors` | X | GICS 섹터 목록 (미지정 시 전체 섹터). 대소문자/별칭 허용 (`materials`, `health care` 등) |
 | `--member` | O | 작업자 이름 (S3 로그 기록용) |
+| `--start-year` | X | 수집 시작 연도 (기본: 2015). 2015 미만이면 dart-fss로 legacy 수집 |
+| `--end-year` | X | 수집 종료 연도 (기본: 2025) |
 | `--skip-s3` | X | S3 업로드 건너뛰기 |
 | `--force` | X | 이미 수집된 데이터도 재수집 |
 | `--dry-run` | X | 수집 대상 기업 목록만 출력하고 종료 |
@@ -165,18 +181,23 @@ python3 run_pipeline.py --status normal \
 엑셀 파일 (수동 배치)
       │
       ▼
-[1/3] 기업 목록 생성
+[1/4] 기업 목록 생성
       ├── 정상 기업: KRX 엑셀 → 업종 기반 범용 GICS 매핑
       └── 상폐 기업: 업종코드 캐시/조회 → GICS 매핑 → 재무적 리스크 필터링
       │
       ▼
-[2/3] 재무제표 수집 (collect.py)
-      ├── DART API로 분기별 재무제표 조회
+[2/4] 재무제표 수집 (2015+, DART OpenAPI)
+      ├── DART API로 분기별 재무제표 조회 (Q1, H1, Q3, ANNUAL)
       ├── 계정과목명 표준화 → 30개 재무비율 계산
       └── CSV 저장: data/output/{섹터}/{종목코드}_{연도}.csv
       │
       ▼
-[3/3] S3 업로드
+[3/4] Legacy 수집 검증 (2015 이전, dart-fss) ← --start-year < 2015 일 때만
+      ├── 누락 연도 자동 탐지 (output 디렉터리 스캔)
+      └── dart-fss로 XBRL/HTML 원문에서 ANNUAL 단위 수집
+      │
+      ▼
+[4/4] S3 업로드
       └── 원본 JSON을 s3://{bucket}/{healthy|delisted}/{섹터}/... 로 업로드
 ```
 
