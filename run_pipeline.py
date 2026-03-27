@@ -531,7 +531,7 @@ def main() -> int:
     start_year = args.start_year if args.start_year is not None else DEFAULT_START_YEAR
     end_year = args.end_year if args.end_year is not None else DEFAULT_END_YEAR
     has_legacy = start_year < LEGACY_CUTOFF_YEAR
-    step_total = 4  # 기업목록 → 수집 → 누락재수집 → S3
+    step_total = 3  # 기업목록 → 수집 → S3
 
     # ── 1) 기업 목록 생성 ──
     print("=" * 60)
@@ -600,21 +600,7 @@ def main() -> int:
     result = _run(collect_cmd, check=False)
     if result.returncode != 0:
         print("\n재무제표 수집 중 오류 발생. 로그를 확인하세요.")
-        # 수집 실패해도 다음 단계는 시도 (이미 수집된 데이터가 있을 수 있음)
-
-    # ── 3) 누락 검증 및 재수집 ──
-    print("\n" + "=" * 60)
-    print(f"[3/{step_total}] 누락 데이터 검증 및 재수집")
-    print("=" * 60)
-
-    retry_cmd = [
-        "python3", "collect.py", "retry",
-        "--save-raw",
-    ]
-
-    result = _run(retry_cmd, check=False)
-    if result.returncode != 0:
-        print("\n누락 재수집 중 오류 발생. 로그를 확인하세요.")
+        # 수집 실패해도 S3 업로드는 시도 (이미 수집된 데이터가 있을 수 있음)
 
     # ── S3 업로드 ──
     s3_step = step_total

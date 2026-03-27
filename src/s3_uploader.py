@@ -3,11 +3,14 @@
 S3 디렉터리 구조
 ─────────────────
 s3://{bucket}/
-  └── {gics_sector}/
-      ├── 019440_2023_Q1.json
-      ├── 019440_2023_H1.json
-      ├── 019440_2023_Q3.json
-      └── 019440_2023_ANNUAL.json
+  ├── healthy/
+  │   └── {gics_sector}/
+  │       ├── 005930_2023_Q1.json
+  │       └── ...
+  └── delisted/
+      └── {gics_sector}/
+          ├── 019440_2023_ANNUAL.json
+          └── ...
 
 필요한 환경변수 (.env)
 ─────────────────────
@@ -141,13 +144,14 @@ def upload_raw_to_s3(
     year: str,
     quarter: str,
     gics_sector: str,
+    label: str = "0",
     bucket: str | None = None,
     region: str | None = None,
 ) -> str:
     """
     원본 재무제표 JSON 1건을 S3에 업로드.
 
-    S3 Key: {gics_sector}/{stock_code}_{year}_{quarter}.json
+    S3 Key: {healthy|delisted}/{gics_sector}/{stock_code}_{year}_{quarter}.json
 
     Args:
         raw_items: DART에서 받은 원시 재무제표 데이터
@@ -155,6 +159,7 @@ def upload_raw_to_s3(
         year: 연도
         quarter: 분기 (Q1, H1, Q3, ANNUAL)
         gics_sector: GICS 섹터명 (예: "Energy", "Industrials")
+        label: "0"=정상(healthy), "1"=상폐(delisted)
         bucket: S3 버킷 이름 (없으면 .env에서 읽기)
         region: AWS 리전 (없으면 .env에서 읽기)
 
@@ -164,8 +169,9 @@ def upload_raw_to_s3(
     config = _get_s3_config(bucket, region)
     client = _get_s3_client(config)
 
-    # S3 key 생성: {gics_sector}/{stock_code}_{year}_{quarter}.json
-    s3_key = f"{gics_sector}/{stock_code}_{year}_{quarter}.json"
+    # S3 key 생성: {healthy|delisted}/{gics_sector}/{stock_code}_{year}_{quarter}.json
+    status_prefix = "delisted" if str(label).strip() == "1" else "healthy"
+    s3_key = f"{status_prefix}/{gics_sector}/{stock_code}_{year}_{quarter}.json"
     body = json.dumps(raw_items, ensure_ascii=False, indent=2).encode("utf-8")
 
     # 업로드 시도 → NoSuchBucket이면 버킷 생성 후 재시도
@@ -202,6 +208,7 @@ def upload_batch_to_s3(
                 "year": "2023",
                 "quarter": "Q1",
                 "gics_sector": "Materials",
+                "label": "1",  # 0=정상(healthy), 1=상폐(delisted)
             },
             ...
         ]
@@ -222,8 +229,11 @@ def upload_batch_to_s3(
     skipped = 0
 
     for entry in raw_data_list:
+        # label: 0=정상(healthy), 1=상폐(delisted)
+        label = str(entry.get("label", "")).strip()
+        status_prefix = "delisted" if label == "1" else "healthy"
         s3_key = (
-            f"{entry['gics_sector']}/"
+            f"{status_prefix}/{entry['gics_sector']}/"
             f"{entry['stock_code']}_{entry['year']}_{entry['quarter']}.json"
         )
 

@@ -181,23 +181,19 @@ python3 run_pipeline.py --status normal \
 엑셀 파일 (수동 배치)
       │
       ▼
-[1/4] 기업 목록 생성
+[1/3] 기업 목록 생성
       ├── 정상 기업: KRX 엑셀 → 업종 기반 범용 GICS 매핑
       └── 상폐 기업: 업종코드 캐시/조회 → GICS 매핑 → 재무적 리스크 필터링
       │
       ▼
-[2/4] 재무제표 수집 (2015+, DART OpenAPI)
-      ├── DART API로 분기별 재무제표 조회 (Q1, H1, Q3, ANNUAL)
+[2/3] 재무제표 수집
+      ├── 2015+: DART OpenAPI로 분기별 재무제표 조회
+      ├── 2015 미만: dart-fss로 XBRL/HTML ANNUAL 단위 수집
       ├── 계정과목명 표준화 → 30개 재무비율 계산
       └── CSV 저장: data/output/{섹터}/{종목코드}_{연도}.csv
       │
       ▼
-[3/4] Legacy 수집 검증 (2015 이전, dart-fss) ← --start-year < 2015 일 때만
-      ├── 누락 연도 자동 탐지 (output 디렉터리 스캔)
-      └── dart-fss로 XBRL/HTML 원문에서 ANNUAL 단위 수집
-      │
-      ▼
-[4/4] S3 업로드
+[3/3] S3 업로드
       └── 원본 JSON을 s3://{bucket}/{healthy|delisted}/{섹터}/... 로 업로드
 ```
 
@@ -255,6 +251,37 @@ python3 collect.py search --name 세아특수강
 python3 collect.py search --stock-code 019440
 python3 collect.py search --name 삼성 --limit 10
 ```
+
+#### 누락 데이터 재수집 (`collect.py retry`)
+
+파이프라인 실행 후 누락된 데이터를 별도로 확인하고 재수집합니다.
+`companies_collected.csv`와 `data/output/` 디렉터리를 비교하여 누락을 자동 탐지합니다.
+
+```bash
+# 누락 목록만 확인 (수집하지 않음)
+python3 collect.py retry --check-only
+
+# 특정 종목만 재수집
+python3 collect.py retry --stock-codes 052670 048260 --save-raw
+
+# 전체 누락 데이터 재수집
+python3 collect.py retry --save-raw
+
+# S3 업로드 포함
+python3 collect.py retry --stock-codes 048260 --save-raw --upload-s3
+```
+
+| 옵션 | 설명 |
+|---|---|
+| `--stock-codes` | 재수집할 종목코드 목록 (미지정 시 전체 누락 대상) |
+| `--check-only` | 누락 목록(`companies_missing.csv`)만 생성하고 종료 |
+| `--fs-div` | CFS/OFS (기본: CFS) |
+| `--output-dir` | output 디렉터리 경로 |
+| `--save-raw` | 원본 JSON 저장 |
+| `--upload-s3` | S3 업로드 |
+| `--delay` | API 호출 간 대기 초 (기본: 0.5) |
+
+> 누락 목록은 `data/input/companies_missing.csv`에 저장되며, legacy(2015 이전)와 modern(2015 이후) 구간이 자동 분류됩니다.
 
 #### `collect.py` CLI 옵션
 

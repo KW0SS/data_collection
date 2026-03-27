@@ -168,21 +168,47 @@ def cmd_collect_legacy(args: argparse.Namespace) -> int:
 
 
 def cmd_retry(args: argparse.Namespace) -> int:
-    """누락 데이터 탐지 및 재수집 (legacy + 2015 이후 모두).
+    """누락 데이터 탐지 및 재수집.
 
-    1) output 디렉터리를 스캔하여 누락 연도 탐지
-    2) companies_missing.csv 생성
-    3) 해당 CSV 기반으로 collect_batch 실행
+    1) companies_collected.csv vs output 디렉터리를 비교하여 누락 탐지
+    2) --stock-codes 지정 시 해당 종목만 필터링
+    3) companies_missing.csv 생성 → collect_batch 실행
     """
     try:
+        import csv as _csv
+
         output_dir = Path(args.output_dir) if args.output_dir else None
 
         # 누락 목록 생성
         missing_csv = generate_missing_csv(output_dir=output_dir)
         print("", file=sys.stderr)
 
+        # --stock-codes 필터링
+        if args.stock_codes:
+            codes = set(args.stock_codes)
+            rows = []
+            with open(missing_csv, newline="", encoding="utf-8-sig") as f:
+                reader = _csv.DictReader(f)
+                fieldnames = reader.fieldnames
+                for row in reader:
+                    if row["stock_code"] in codes:
+                        rows.append(row)
+
+            if not rows:
+                print(f"지정한 종목코드에 누락 데이터가 없습니다: {args.stock_codes}")
+                return 0
+
+            # 필터링된 목록으로 덮어쓰기
+            with open(missing_csv, "w", newline="", encoding="utf-8-sig") as f:
+                writer = _csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(rows)
+
+            total = sum(int(r["end_year"]) - int(r["start_year"]) + 1 for r in rows)
+            print(f"  → {len(rows)}개 구간, {total}건으로 필터링됨\n", file=sys.stderr)
+
         if args.check_only:
-            print(f"누락 목록만 생성: {missing_csv}")
+            print(f"누락 목록: {missing_csv}")
             return 0
 
         # 누락 데이터 수집
@@ -335,6 +361,10 @@ def build_parser() -> argparse.ArgumentParser:
     retry_p = sub.add_parser(
         "retry",
         help="누락 데이터 탐지 및 재수집 (legacy + 2015 이후 모두)",
+    )
+    retry_p.add_argument(
+        "--stock-codes", nargs="+",
+        help="재수집할 종목코드 목록 (미지정 시 전체 누락 대상)",
     )
     retry_p.add_argument(
         "--check-only", action="store_true",

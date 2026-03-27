@@ -464,6 +464,7 @@ def collect_batch(
                         "year": yr,
                         "quarter": "ANNUAL",
                         "gics_sector": gics,
+                        "label": comp.get("label", ""),
                     })
 
                 if delay > 0:
@@ -502,6 +503,7 @@ def collect_batch(
                         "year": yr,
                         "quarter": q,
                         "gics_sector": gics,
+                        "label": comp.get("label", ""),
                     })
 
                 if delay > 0:
