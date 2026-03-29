@@ -95,8 +95,20 @@ def download_corp_codes(api_key: str, out_path: Path = CORP_XML_PATH) -> Path:
     return out_path
 
 
+# ── 모듈 레벨 캐시 (XML 반복 파싱 방지) ─────────────────────
+_corp_cache: dict[str, list[dict[str, str]]] = {}
+_stock_index: dict[str, dict[str, str]] = {}
+
+
 def load_corp_codes(xml_path: Path = CORP_XML_PATH) -> list[dict[str, str]]:
-    """기업코드 XML → [{corp_code, corp_name, stock_code, ...}, ...]"""
+    """기업코드 XML → [{corp_code, corp_name, stock_code, ...}, ...]
+
+    결과를 모듈 레벨에 캐시하여 동일 프로세스 내 반복 파싱을 방지합니다.
+    """
+    key = str(xml_path)
+    if key in _corp_cache:
+        return _corp_cache[key]
+
     if not xml_path.exists():
         raise DartApiError(
             f"{xml_path}에 기업코드 XML이 없습니다. "
@@ -106,12 +118,19 @@ def load_corp_codes(xml_path: Path = CORP_XML_PATH) -> list[dict[str, str]]:
     root = tree.getroot()
     rows: list[dict[str, str]] = []
     for node in root.findall("list"):
-        rows.append({
+        row = {
             "corp_code": (node.findtext("corp_code") or "").strip(),
             "corp_name": (node.findtext("corp_name") or "").strip(),
             "stock_code": (node.findtext("stock_code") or "").strip(),
             "modify_date": (node.findtext("modify_date") or "").strip(),
-        })
+        }
+        rows.append(row)
+        # stock_code 인덱스 구축 (O(1) 조회용)
+        sc = row["stock_code"]
+        if sc:
+            _stock_index[sc] = row
+
+    _corp_cache[key] = rows
     return rows
 
 
@@ -123,9 +142,15 @@ def find_corp(
 ) -> list[dict[str, str]]:
     """기업명 또는 종목코드로 DART corp_code 검색."""
     rows = load_corp_codes(xml_path)
+
+    # stock_code 단독 검색 → O(1) 인덱스 활용
+    stock_q = (stock_code or "").strip()
+    if stock_q and not corp_name:
+        hit = _stock_index.get(stock_q)
+        return [hit] if hit else []
+
     results: list[dict[str, str]] = []
     name_q = (corp_name or "").lower()
-    stock_q = (stock_code or "").strip()
 
     for row in rows:
         if name_q and name_q not in row["corp_name"].lower():

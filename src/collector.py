@@ -403,6 +403,24 @@ def collect_batch(
                 if eq:
                     existing_quarters[(sc, yr)] = eq
 
+    # ── 진행 상태 추적 (중단 후 재시작 지원) ────────────────────
+    progress_file = save_dir / ".collect_progress.json"
+    completed_keys: set[str] = set()
+    if not force and progress_file.exists():
+        try:
+            completed_keys = set(json.loads(progress_file.read_text()))
+            if completed_keys:
+                print(
+                    f"  ♻️  이전 진행 상태 복원: {len(completed_keys)}건 완료됨",
+                    file=sys.stderr,
+                )
+        except (json.JSONDecodeError, OSError):
+            completed_keys = set()
+
+    def _save_progress() -> None:
+        """현재 진행 상태를 파일에 저장."""
+        progress_file.write_text(json.dumps(list(completed_keys)))
+
     # ── 결과 수집 ──────────────────────────────────────────────
     new_rows: list[dict[str, Any]] = []
     s3_upload_queue: list[dict[str, Any]] = []
@@ -427,6 +445,12 @@ def collect_batch(
             if is_legacy:
                 # 2015년 이전: dart-fss로 사업보고서(ANNUAL) 단위 수집
                 done += len(quarters)  # legacy는 분기 루프 대신 연도 단위
+                progress_key = f"{sc}_{yr}_ANNUAL"
+
+                # ── 진행 상태 체크 (이전 실행에서 완료) ──
+                if progress_key in completed_keys:
+                    skipped += len(quarters)
+                    continue
 
                 # ── 중복 체크 ──
                 if not force and "ANNUAL" in existing_quarters.get((sc, yr), set()):
@@ -436,6 +460,7 @@ def collect_batch(
                         file=sys.stderr,
                     )
                     skipped += len(quarters)
+                    completed_keys.add(progress_key)
                     continue
 
                 print(
@@ -467,12 +492,23 @@ def collect_batch(
                         "label": comp.get("label", ""),
                     })
 
+                # 진행 상태 기록
+                completed_keys.add(progress_key)
+                if len(completed_keys) % 10 == 0:
+                    _save_progress()
+
                 if delay > 0:
                     time.sleep(delay)
                 continue
 
             for q in quarters:
                 done += 1
+                progress_key = f"{sc}_{yr}_{q}"
+
+                # ── 진행 상태 체크 (이전 실행에서 완료) ──
+                if progress_key in completed_keys:
+                    skipped += 1
+                    continue
 
                 # ── 중복 체크 ──
                 if not force and q in existing_quarters.get((sc, yr), set()):
@@ -482,6 +518,7 @@ def collect_batch(
                         file=sys.stderr,
                     )
                     skipped += 1
+                    completed_keys.add(progress_key)
                     continue
 
                 print(f"  [{done}/{total}] {cn or sc} {yr}-{q} ... 수집 중", file=sys.stderr)
@@ -505,6 +542,11 @@ def collect_batch(
                         "gics_sector": gics,
                         "label": comp.get("label", ""),
                     })
+
+                # 진행 상태 기록
+                completed_keys.add(progress_key)
+                if len(completed_keys) % 10 == 0:
+                    _save_progress()
 
                 if delay > 0:
                     time.sleep(delay)
@@ -565,6 +607,11 @@ def collect_batch(
         f"  ({len(saved_files)}개 파일 저장)",
         file=sys.stderr,
     )
+
+    # ── 진행 상태 파일 정리 (정상 완료 시 삭제) ────────────────
+    if progress_file.exists():
+        progress_file.unlink()
+        print("  🗑️  진행 상태 파일 삭제 (.collect_progress.json)", file=sys.stderr)
 
     # ── S3 업로드 ─────────────────────────────────────────────
     if upload_s3 and s3_upload_queue:
