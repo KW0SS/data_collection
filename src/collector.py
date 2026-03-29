@@ -764,14 +764,26 @@ def generate_missing_legacy_csv(
         if not missing_years:
             continue
 
-        missing_entries.append({
-            "stock_code": sc,
-            "corp_name": comp.get("corp_name", ""),
-            "label": comp.get("label", ""),
-            "gics_sector": comp.get("gics_sector", "Unknown"),
-            "start_year": str(missing_years[0]),
-            "end_year": str(missing_years[-1]),
-        })
+        # 연속 구간으로 분리 (예: [2005,2006,2010,2011] → [(2005,2006), (2010,2011)])
+        ranges: list[tuple[int, int]] = []
+        range_start = missing_years[0]
+        prev = missing_years[0]
+        for yr in missing_years[1:]:
+            if yr != prev + 1:
+                ranges.append((range_start, prev))
+                range_start = yr
+            prev = yr
+        ranges.append((range_start, prev))
+
+        for rs, re in ranges:
+            missing_entries.append({
+                "stock_code": sc,
+                "corp_name": comp.get("corp_name", ""),
+                "label": comp.get("label", ""),
+                "gics_sector": comp.get("gics_sector", "Unknown"),
+                "start_year": str(rs),
+                "end_year": str(re),
+            })
 
     INPUT_DIR.mkdir(parents=True, exist_ok=True)
     with open(MISSING_LEGACY_CSV, "w", newline="", encoding="utf-8-sig") as f:

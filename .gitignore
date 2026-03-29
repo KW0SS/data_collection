@@ -7,5 +7,8 @@ __pycache__/
 *.zip
 *.log
 data/etc/
+data/raw/
+data/output/
+logs/
 automation/reports/
 prs/context.json

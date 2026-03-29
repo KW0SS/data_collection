@@ -177,6 +177,22 @@ DART OpenAPI(`fnlttSinglAcntAll`)는 2015년 이후 데이터만 지원하기 �
   - [automation] report md  : automation/reports/20260329_150303_289410_non-s3_report.md
   - [automation] overall=FAIL
 
+## 리뷰 반영 수정 사항
+
+### (Critical) S3 업로드 단계 미동작 수정
+- **원인**: 2단계에서 수집 완료 후, 3단계에서 `collect --upload-s3`를 다시 호출하면 `force=False`일 때 기존 데이터를 스킵하여 S3 업로드 큐가 비어 업로드가 실행되지 않음
+- **수정**: 수집과 S3 업로드를 **한 번의 `collect_batch` 호출**로 통합. 파이프라인을 3단계 → 2단계로 축소 (`[1/2] 기업목록 → [2/2] 수집+S3`)
+- **효과**: `force=True` 시 API 비용 2배 문제도 동시 해결
+
+### (High) 저장소 비대화 방지
+- `.gitignore`에 `data/raw/`, `data/output/`, `logs/` 추가
+- 이미 커밋된 파일은 머지 전 `git rm --cached`로 정리 필요
+
+### (Medium) legacy 누락 목록 과대 계산 수정
+- **원인**: `generate_missing_legacy_csv()`가 `missing_years[0]~missing_years[-1]`로 한 줄 생성 → 중간에 이미 수집된 연도까지 누락으로 포함
+- **수정**: `generate_missing_csv()`와 동일한 **연속 구간 분리** 로직 적용 (예: `[2005,2006,2010,2011]` → `(2005,2006)` + `(2010,2011)` 두 행)
+
 ## 앞으로 진행할 내용
+- 이미 커밋된 `data/raw/`, `data/output/`, `logs/` 파일을 `git rm --cached`로 추적 해제 후 커밋
 - 필요 시 `python3 -m automation.run_checks --mode s3-only`로 S3 무결성 별도 점검
 - PR 리뷰 반영 후 커밋 정리 및 머지

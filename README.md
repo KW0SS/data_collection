@@ -192,20 +192,17 @@ python3 run_pipeline.py --status normal \
 엑셀 파일 (수동 배치)
       │
       ▼
-[1/3] 기업 목록 생성
+[1/2] 기업 목록 생성
       ├── 정상 기업: KRX 엑셀 → 업종 기반 범용 GICS 매핑
       └── 상폐 기업: 업종코드 캐시/조회 → GICS 매핑 → 재무적 리스크 필터링
       │
       ▼
-[2/3] 재무제표 수집
+[2/2] 재무제표 수집 + S3 업로드
       ├── 2015+: DART OpenAPI로 분기별 재무제표 조회
       ├── 2015 미만: dart-fss로 XBRL/HTML ANNUAL 단위 수집
       ├── 계정과목명 표준화 → 30개 재무비율 계산
-      └── CSV 저장: data/output/{섹터}/{종목코드}_{연도}.csv
-      │
-      ▼
-[3/3] S3 업로드
-      └── 원본 JSON을 s3://{bucket}/{healthy|delisted}/{섹터}/... 로 업로드
+      ├── CSV 저장: data/output/{섹터}/{종목코드}_{연도}.csv
+      └── S3 업로드: s3://{bucket}/{healthy|delisted}/{섹터}/... (--skip-s3로 생략 가능)
 ```
 
 ---

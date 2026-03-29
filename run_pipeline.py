@@ -531,7 +531,7 @@ def main() -> int:
     start_year = args.start_year if args.start_year is not None else DEFAULT_START_YEAR
     end_year = args.end_year if args.end_year is not None else DEFAULT_END_YEAR
     has_legacy = start_year < LEGACY_CUTOFF_YEAR
-    step_total = 3  # 기업목록 → 수집 → S3
+    step_total = 2  # 기업목록 → 수집(+S3)
 
     # ── 1) 기업 목록 생성 ──
     print("=" * 60)
@@ -584,9 +584,12 @@ def main() -> int:
     df_all.to_csv(str(PIPELINE_CSV), index=False, encoding="utf-8-sig")
     print(f"\n기업 목록 저장: {PIPELINE_CSV}")
 
-    # ── 2) 재무제표 수집 ──
+    # ── 2) 재무제표 수집 (+ S3 업로드) ──
     print("\n" + "=" * 60)
-    print(f"[2/{step_total}] 재무제표 수집 (collect.py)")
+    if args.skip_s3:
+        print(f"[2/{step_total}] 재무제표 수집 (collect.py)")
+    else:
+        print(f"[2/{step_total}] 재무제표 수집 + S3 업로드 (collect.py)")
     print("=" * 60)
 
     collect_cmd = [
@@ -594,36 +597,18 @@ def main() -> int:
         "--companies", str(PIPELINE_CSV),
         "--save-raw",
     ]
+    # S3 업로드를 수집과 동시에 처리 (별도 단계로 분리하면 스킵됨)
+    if not args.skip_s3:
+        collect_cmd.append("--upload-s3")
     if args.force:
         collect_cmd.append("--force")
 
     result = _run(collect_cmd, check=False)
     if result.returncode != 0:
         print("\n재무제표 수집 중 오류 발생. 로그를 확인하세요.")
-        # 수집 실패해도 S3 업로드는 시도 (이미 수집된 데이터가 있을 수 있음)
 
-    # ── S3 업로드 ──
-    s3_step = step_total
     if args.skip_s3:
         print("\n[skip] S3 업로드 건너뜀 (--skip-s3)")
-    else:
-        print("\n" + "=" * 60)
-        print(f"[{s3_step}/{step_total}] S3 업로드")
-        print("=" * 60)
-
-        # collect.py의 --upload-s3 로 업로드 (수집과 동시 처리도 가능)
-        upload_sectors = args.sectors or df_all["gics_sector"].unique().tolist()
-        for sector in upload_sectors:
-            print(f"\n  섹터: {sector}")
-            s3_cmd = [
-                "python3", "collect.py", "collect",
-                "--companies", str(PIPELINE_CSV),
-                "--upload-s3",
-            ]
-            if args.force:
-                s3_cmd.append("--force")
-            _run(s3_cmd, check=False)
-            break  # collect_batch가 전체 기업을 한 번에 처리하므로 한 번만 실행
 
     # ── 완료 ──
     print("\n" + "=" * 60)
