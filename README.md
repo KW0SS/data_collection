@@ -95,6 +95,17 @@ S3_REGION=ap-northeast-2
 
 ## 사용법
 
+### 추천 실행 순서 (운영 가이드)
+
+| 단계 | 목적 | 로컬 수집 | S3(버킷) 업로드 | 권장 명령어 |
+|---|---|---|---|---|
+| 1) 리스트 확인 | 대상 기업만 점검 (수집 실행 X) | X | X | `python3 run_pipeline.py --status normal --sectors "Materials" --member hann --dry-run` |
+| 2) 단일 테스트 | 1개 종목으로 수집/업로드 동작 확인 | O | O | `python3 collect.py collect --stock-codes 019440 --years 2023 --quarters ANNUAL --save-raw --upload-s3` |
+| 3) 본 수집 실행 | 리스트 기준 대량 수집/업로드 | O | O | `python3 run_pipeline.py --status normal --sectors "Materials" --member hann` |
+
+> 단계 2에서 `019440`은 실제 존재하는 테스트 종목코드로 교체하세요.
+> 단계 3에서 `--sectors`는 원하는 섹터명으로 바꿔 실행하면 됩니다.
+
 ### 방법 1: 통합 파이프라인 (`run_pipeline.py`) — 권장
 
 엑셀 파일만 배치하면 **기업 목록 생성 → 재무제표 수집 → S3 업로드**를 한 번에 수행합니다.
@@ -132,7 +143,21 @@ python3 run_pipeline.py --status delisted \
 python3 run_pipeline.py --status normal \
     --sectors "Materials" \
     --member hann --force
+
+# 2015년 이전 데이터 포함 (dart-fss 자동 사용)
+python3 run_pipeline.py --status delisted \
+    --sectors "Materials" \
+    --member hann --start-year 2002 --skip-s3
+
+# 정상 기업 2010~2025 전체 수집
+python3 run_pipeline.py --status normal \
+    --sectors "Information Technology" \
+    --member hann --start-year 2010 --end-year 2025
 ```
+
+> **2015년 이전 데이터:** DART OpenAPI(`fnlttSinglAcntAll`)는 2015년 이후만 지원합니다.
+> `--start-year`를 2015 미만으로 지정하면 해당 구간은 `dart-fss` 라이브러리를 통해
+> XBRL/HTML 원문에서 사업보고서(ANNUAL) 단위로 자동 수집됩니다.
 
 #### `run_pipeline.py` CLI 옵션
 
@@ -141,6 +166,8 @@ python3 run_pipeline.py --status normal \
 | `--status` | O | 수집 대상: `normal`(정상), `delisted`(상폐), `all`(전체) |
 | `--sectors` | X | GICS 섹터 목록 (미지정 시 전체 섹터). 대소문자/별칭 허용 (`materials`, `health care` 등) |
 | `--member` | O | 작업자 이름 (S3 로그 기록용) |
+| `--start-year` | X | 수집 시작 연도 (기본: 2015). 2015 미만이면 dart-fss로 legacy 수집 |
+| `--end-year` | X | 수집 종료 연도 (기본: 2025) |
 | `--skip-s3` | X | S3 업로드 건너뛰기 |
 | `--force` | X | 이미 수집된 데이터도 재수집 |
 | `--dry-run` | X | 수집 대상 기업 목록만 출력하고 종료 |
@@ -165,19 +192,17 @@ python3 run_pipeline.py --status normal \
 엑셀 파일 (수동 배치)
       │
       ▼
-[1/3] 기업 목록 생성
+[1/2] 기업 목록 생성
       ├── 정상 기업: KRX 엑셀 → 업종 기반 범용 GICS 매핑
       └── 상폐 기업: 업종코드 캐시/조회 → GICS 매핑 → 재무적 리스크 필터링
       │
       ▼
-[2/3] 재무제표 수집 (collect.py)
-      ├── DART API로 분기별 재무제표 조회
+[2/2] 재무제표 수집 + S3 업로드
+      ├── 2015+: DART OpenAPI로 분기별 재무제표 조회
+      ├── 2015 미만: dart-fss로 XBRL/HTML ANNUAL 단위 수집
       ├── 계정과목명 표준화 → 30개 재무비율 계산
-      └── CSV 저장: data/output/{섹터}/{종목코드}_{연도}.csv
-      │
-      ▼
-[3/3] S3 업로드
-      └── 원본 JSON을 s3://{bucket}/{healthy|delisted}/{섹터}/... 로 업로드
+      ├── CSV 저장: data/output/{섹터}/{종목코드}_{연도}.csv
+      └── S3 업로드: s3://{bucket}/{healthy|delisted}/{섹터}/... (--skip-s3로 생략 가능)
 ```
 
 ---
@@ -234,6 +259,37 @@ python3 collect.py search --name 세아특수강
 python3 collect.py search --stock-code 019440
 python3 collect.py search --name 삼성 --limit 10
 ```
+
+#### 누락 데이터 재수집 (`collect.py retry`)
+
+파이프라인 실행 후 누락된 데이터를 별도로 확인하고 재수집합니다.
+`companies_collected.csv`와 `data/output/` 디렉터리를 비교하여 누락을 자동 탐지합니다.
+
+```bash
+# 누락 목록만 확인 (수집하지 않음)
+python3 collect.py retry --check-only
+
+# 특정 종목만 재수집
+python3 collect.py retry --stock-codes 052670 048260 --save-raw
+
+# 전체 누락 데이터 재수집
+python3 collect.py retry --save-raw
+
+# S3 업로드 포함
+python3 collect.py retry --stock-codes 048260 --save-raw --upload-s3
+```
+
+| 옵션 | 설명 |
+|---|---|
+| `--stock-codes` | 재수집할 종목코드 목록 (미지정 시 전체 누락 대상) |
+| `--check-only` | 누락 목록(`companies_missing.csv`)만 생성하고 종료 |
+| `--fs-div` | CFS/OFS (기본: CFS) |
+| `--output-dir` | output 디렉터리 경로 |
+| `--save-raw` | 원본 JSON 저장 |
+| `--upload-s3` | S3 업로드 |
+| `--delay` | API 호출 간 대기 초 (기본: 0.5) |
+
+> 누락 목록은 `data/input/companies_missing.csv`에 저장되며, legacy(2015 이전)와 modern(2015 이후) 구간이 자동 분류됩니다.
 
 #### `collect.py` CLI 옵션
 

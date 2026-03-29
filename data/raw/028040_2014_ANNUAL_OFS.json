@@ -1,0 +1,905 @@
+[
+  {
+    "sj_div": "BS",
+    "account_nm": "유동자산",
+    "thstrm_amount": "6328653517",
+    "frmtrm_amount": "6855644807",
+    "bfefrmtrm_amount": "13810823639"
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "현금및현금성자산",
+    "thstrm_amount": "29962484",
+    "frmtrm_amount": "38550939",
+    "bfefrmtrm_amount": "521466783"
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "단기금융상품",
+    "thstrm_amount": "0",
+    "frmtrm_amount": "0",
+    "bfefrmtrm_amount": "0"
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "매출채권 및 기타유동채권",
+    "thstrm_amount": "1590392746",
+    "frmtrm_amount": "1834481431",
+    "bfefrmtrm_amount": "5325089479"
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "재고자산",
+    "thstrm_amount": "4397856489",
+    "frmtrm_amount": "4697886685",
+    "bfefrmtrm_amount": "7786125302"
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "당기법인세자산",
+    "thstrm_amount": "3100",
+    "frmtrm_amount": "693760",
+    "bfefrmtrm_amount": "8722770"
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "기타유동금융자산",
+    "thstrm_amount": "310438698",
+    "frmtrm_amount": "284031992",
+    "bfefrmtrm_amount": "169419305"
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "비유동자산",
+    "thstrm_amount": "39047906587",
+    "frmtrm_amount": "38989968123",
+    "bfefrmtrm_amount": "45425387058"
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "장기금융상품",
+    "thstrm_amount": "166000000",
+    "frmtrm_amount": "76000000",
+    "bfefrmtrm_amount": "46000000"
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "장기매출채권 및 기타비유동채권",
+    "thstrm_amount": "649200746",
+    "frmtrm_amount": "762414594",
+    "bfefrmtrm_amount": "802357708"
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "종속기업투자",
+    "thstrm_amount": null,
+    "frmtrm_amount": null,
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "유형자산",
+    "thstrm_amount": "37231445027",
+    "frmtrm_amount": "37563482352",
+    "bfefrmtrm_amount": "43911785300"
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "무형자산",
+    "thstrm_amount": "1001260814",
+    "frmtrm_amount": "588071177",
+    "bfefrmtrm_amount": "665244050"
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "자산총계",
+    "thstrm_amount": "45376560104",
+    "frmtrm_amount": "45845612930",
+    "bfefrmtrm_amount": "59236210697"
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "유동부채",
+    "thstrm_amount": "24680285414",
+    "frmtrm_amount": "29906977797",
+    "bfefrmtrm_amount": "33042928979"
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "매입채무 및 기타유동채무",
+    "thstrm_amount": "3654251801",
+    "frmtrm_amount": "3435179955",
+    "bfefrmtrm_amount": "6574559164"
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "단기차입금",
+    "thstrm_amount": "18373391520",
+    "frmtrm_amount": "24485703399",
+    "bfefrmtrm_amount": "21195659550"
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "유동성장기차입금",
+    "thstrm_amount": "2053906133",
+    "frmtrm_amount": "699992000",
+    "bfefrmtrm_amount": "4739666840"
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "금융리스부채",
+    "thstrm_amount": "352185618",
+    "frmtrm_amount": "587236663",
+    "bfefrmtrm_amount": "0"
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "기타유동금융부채",
+    "thstrm_amount": "153742176",
+    "frmtrm_amount": "339834569",
+    "bfefrmtrm_amount": "313400258"
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "기타유동비금융부채",
+    "thstrm_amount": "92808166",
+    "frmtrm_amount": "359031211",
+    "bfefrmtrm_amount": "219643167"
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "비유동부채",
+    "thstrm_amount": "5851346916",
+    "frmtrm_amount": "8968648017",
+    "bfefrmtrm_amount": "3704065086"
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "장기매입채무 및 기타비유동채무",
+    "thstrm_amount": "55000000",
+    "frmtrm_amount": "75400000",
+    "bfefrmtrm_amount": "0"
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "장기차입금",
+    "thstrm_amount": "3276965159",
+    "frmtrm_amount": "5355845461",
+    "bfefrmtrm_amount": "300000000"
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "금융리스부채",
+    "thstrm_amount": "65383043",
+    "frmtrm_amount": "432957232",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "순확정급여부채",
+    "thstrm_amount": "932732049",
+    "frmtrm_amount": "1898743059",
+    "bfefrmtrm_amount": "2198362821"
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "이연법인세부채",
+    "thstrm_amount": "1521266665",
+    "frmtrm_amount": "1205702265",
+    "bfefrmtrm_amount": "1205702265"
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "부채총계",
+    "thstrm_amount": "30531632330",
+    "frmtrm_amount": "38875625814",
+    "bfefrmtrm_amount": "36746994065"
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "자본금",
+    "thstrm_amount": "8500399000",
+    "frmtrm_amount": "3958269500",
+    "bfefrmtrm_amount": "3958269500"
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "기타불입자본",
+    "thstrm_amount": "33443864533",
+    "frmtrm_amount": "25999609395",
+    "bfefrmtrm_amount": "25999609395"
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "기타포괄손익누계액",
+    "thstrm_amount": "1118819252",
+    "frmtrm_amount": "0",
+    "bfefrmtrm_amount": "0"
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "이익잉여금(결손금)",
+    "thstrm_amount": "-28218155011",
+    "frmtrm_amount": "-22987891779",
+    "bfefrmtrm_amount": "-7468662263"
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "자본총계",
+    "thstrm_amount": "14844927774",
+    "frmtrm_amount": "6969987116",
+    "bfefrmtrm_amount": "22489216632"
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "자본과부채총계",
+    "thstrm_amount": "45376560104",
+    "frmtrm_amount": "45845612930",
+    "bfefrmtrm_amount": "59236210697"
+  },
+  {
+    "sj_div": "CIS",
+    "account_nm": "매출액",
+    "thstrm_amount": "11263300682",
+    "frmtrm_amount": "21044457870",
+    "bfefrmtrm_amount": "28444885458"
+  },
+  {
+    "sj_div": "CIS",
+    "account_nm": "제품매출액",
+    "thstrm_amount": "11082886973",
+    "frmtrm_amount": "20954674966",
+    "bfefrmtrm_amount": "27786873774"
+  },
+  {
+    "sj_div": "CIS",
+    "account_nm": "상품매출액",
+    "thstrm_amount": "108359951",
+    "frmtrm_amount": "30187368",
+    "bfefrmtrm_amount": "602032869"
+  },
+  {
+    "sj_div": "CIS",
+    "account_nm": "기타매출액",
+    "thstrm_amount": "72053758",
+    "frmtrm_amount": "59595536",
+    "bfefrmtrm_amount": "55978815"
+  },
+  {
+    "sj_div": "CIS",
+    "account_nm": "매출원가",
+    "thstrm_amount": "13892470858",
+    "frmtrm_amount": "24158190367",
+    "bfefrmtrm_amount": "27914256542"
+  },
+  {
+    "sj_div": "CIS",
+    "account_nm": "제품매출원가",
+    "thstrm_amount": "13799935989",
+    "frmtrm_amount": "24130546759",
+    "bfefrmtrm_amount": "27341616156"
+  },
+  {
+    "sj_div": "CIS",
+    "account_nm": "상품매출원가",
+    "thstrm_amount": "55593568",
+    "frmtrm_amount": "23988600",
+    "bfefrmtrm_amount": "571810454"
+  },
+  {
+    "sj_div": "CIS",
+    "account_nm": "기타매출원가",
+    "thstrm_amount": "36941301",
+    "frmtrm_amount": "3655008",
+    "bfefrmtrm_amount": "829932"
+  },
+  {
+    "sj_div": "CIS",
+    "account_nm": "매출총이익",
+    "thstrm_amount": "-2629170176",
+    "frmtrm_amount": "-3113732497",
+    "bfefrmtrm_amount": "530628916"
+  },
+  {
+    "sj_div": "CIS",
+    "account_nm": "판매비",
+    "thstrm_amount": "225156467",
+    "frmtrm_amount": "558590639",
+    "bfefrmtrm_amount": "823581387"
+  },
+  {
+    "sj_div": "CIS",
+    "account_nm": "관리비",
+    "thstrm_amount": "-2634257245",
+    "frmtrm_amount": "-2969014642",
+    "bfefrmtrm_amount": "-3345164475"
+  },
+  {
+    "sj_div": "CIS",
+    "account_nm": "영업이익(손실)",
+    "thstrm_amount": "-5488583888",
+    "frmtrm_amount": "-6641337778",
+    "bfefrmtrm_amount": "-3638116946"
+  },
+  {
+    "sj_div": "CIS",
+    "account_nm": "금융수익",
+    "thstrm_amount": "2208345655",
+    "frmtrm_amount": "367522052",
+    "bfefrmtrm_amount": "520895097"
+  },
+  {
+    "sj_div": "CIS",
+    "account_nm": "금융비용",
+    "thstrm_amount": "1694550218",
+    "frmtrm_amount": "1933066205",
+    "bfefrmtrm_amount": "1819268212"
+  },
+  {
+    "sj_div": "CIS",
+    "account_nm": "기타영업외수익",
+    "thstrm_amount": "361645743",
+    "frmtrm_amount": "489383474",
+    "bfefrmtrm_amount": "508677626"
+  },
+  {
+    "sj_div": "CIS",
+    "account_nm": "기타영업외비용",
+    "thstrm_amount": "890310907",
+    "frmtrm_amount": "7946206960",
+    "bfefrmtrm_amount": "1567973023"
+  },
+  {
+    "sj_div": "CIS",
+    "account_nm": "법인세비용차감전순이익(손실)",
+    "thstrm_amount": "-5503453615",
+    "frmtrm_amount": "-15663705417",
+    "bfefrmtrm_amount": "-5995785458"
+  },
+  {
+    "sj_div": "CIS",
+    "account_nm": "법인세비용",
+    "thstrm_amount": "-60101884",
+    "frmtrm_amount": "-31784698",
+    "bfefrmtrm_amount": "0"
+  },
+  {
+    "sj_div": "CIS",
+    "account_nm": "당기순이익(손실)",
+    "thstrm_amount": "-5443351731",
+    "frmtrm_amount": "-15631920719",
+    "bfefrmtrm_amount": "-5995785458"
+  },
+  {
+    "sj_div": "CIS",
+    "account_nm": "기타포괄손익",
+    "thstrm_amount": "1331907751",
+    "frmtrm_amount": "112691203",
+    "bfefrmtrm_amount": "-158272849"
+  },
+  {
+    "sj_div": "CIS",
+    "account_nm": "후속적으로 당기손익으로 재분류되지 않는 항목",
+    "thstrm_amount": null,
+    "frmtrm_amount": null,
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CIS",
+    "account_nm": "순확정급여부채의 재측정요소",
+    "thstrm_amount": "213088499",
+    "frmtrm_amount": "112691203",
+    "bfefrmtrm_amount": "-158272849"
+  },
+  {
+    "sj_div": "CIS",
+    "account_nm": "당기손익으로 재분류되지 않는 항목의 법인세",
+    "thstrm_amount": null,
+    "frmtrm_amount": null,
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CIS",
+    "account_nm": "유형자산 재평가잉여금",
+    "thstrm_amount": "1118819252",
+    "frmtrm_amount": "0",
+    "bfefrmtrm_amount": "0"
+  },
+  {
+    "sj_div": "CIS",
+    "account_nm": "총포괄손익",
+    "thstrm_amount": "-4111443980",
+    "frmtrm_amount": "-15519229516",
+    "bfefrmtrm_amount": "-6154058307"
+  },
+  {
+    "sj_div": "CIS",
+    "account_nm": "기본주당이익(손실)",
+    "thstrm_amount": "-614",
+    "frmtrm_amount": "-1992",
+    "bfefrmtrm_amount": "-830"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "영업활동현금흐름",
+    "thstrm_amount": "-5760701940",
+    "frmtrm_amount": "-1346252262",
+    "bfefrmtrm_amount": "-3695174181"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "당기순이익(손실)",
+    "thstrm_amount": "-5443351731",
+    "frmtrm_amount": "-15631920719",
+    "bfefrmtrm_amount": "-5995785458"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "당기순이익조정을 위한 가감",
+    "thstrm_amount": "1325640257",
+    "frmtrm_amount": "15839742249",
+    "bfefrmtrm_amount": "3943826736"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "감가상각비",
+    "thstrm_amount": "1376948939",
+    "frmtrm_amount": "1777975506",
+    "bfefrmtrm_amount": "1475047991"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "퇴직급여",
+    "thstrm_amount": "364127595",
+    "frmtrm_amount": "599785174",
+    "bfefrmtrm_amount": "484169483"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "대손상각비",
+    "thstrm_amount": "0",
+    "frmtrm_amount": "43916522",
+    "bfefrmtrm_amount": "652127698"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "기타의대손상각비",
+    "thstrm_amount": "100000000",
+    "frmtrm_amount": "53815500",
+    "bfefrmtrm_amount": "0"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "법인세수익",
+    "thstrm_amount": "-60101884",
+    "frmtrm_amount": "-31784698",
+    "bfefrmtrm_amount": "0"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "금융수익",
+    "thstrm_amount": "-1685156889",
+    "frmtrm_amount": "-17242853",
+    "bfefrmtrm_amount": "-79078130"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "금융비용",
+    "thstrm_amount": "1694550218",
+    "frmtrm_amount": "1884358724",
+    "bfefrmtrm_amount": "1740307844"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "유형자산처분이익",
+    "thstrm_amount": "0",
+    "frmtrm_amount": "13025912",
+    "bfefrmtrm_amount": "9723713"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "유형자산처분손실",
+    "thstrm_amount": "47711766",
+    "frmtrm_amount": "128571661",
+    "bfefrmtrm_amount": "32546476"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "무형자산상각비",
+    "thstrm_amount": "159707781",
+    "frmtrm_amount": "233007692",
+    "bfefrmtrm_amount": "322924121"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "유형자산손상차손",
+    "thstrm_amount": "410416815",
+    "frmtrm_amount": "6744772714",
+    "bfefrmtrm_amount": "0"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "무형자산손상차손",
+    "thstrm_amount": "0",
+    "frmtrm_amount": "258187886",
+    "bfefrmtrm_amount": "0"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "대손충당금환입",
+    "thstrm_amount": "175070167",
+    "frmtrm_amount": "49250000",
+    "bfefrmtrm_amount": "0"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "재고자산평가손실",
+    "thstrm_amount": "0",
+    "frmtrm_amount": "0",
+    "bfefrmtrm_amount": "37944533"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "금융보증부채전입",
+    "thstrm_amount": "-186092393",
+    "frmtrm_amount": "26434311",
+    "bfefrmtrm_amount": "0"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "외화환산이익",
+    "thstrm_amount": "343453570",
+    "frmtrm_amount": "474875347",
+    "bfefrmtrm_amount": "123517578"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "외화환산손실",
+    "thstrm_amount": "54939071",
+    "frmtrm_amount": "252641871",
+    "bfefrmtrm_amount": "128992077"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "매출채권 및 기타유동채권의 감소(증가)",
+    "thstrm_amount": "417859586",
+    "frmtrm_amount": "2962638966",
+    "bfefrmtrm_amount": "-1143742965"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "재고자산의감소(증가)",
+    "thstrm_amount": "300030196",
+    "frmtrm_amount": "3088238617",
+    "bfefrmtrm_amount": "-732920420"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "미수금의감소",
+    "thstrm_amount": "72614612",
+    "frmtrm_amount": "341649119",
+    "bfefrmtrm_amount": "529511907"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "기타유동자산의증가",
+    "thstrm_amount": "-75716046",
+    "frmtrm_amount": "-106583677",
+    "bfefrmtrm_amount": "-30210278"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "장기미수금의증가",
+    "thstrm_amount": "0",
+    "frmtrm_amount": "-16286587",
+    "bfefrmtrm_amount": "-816738607"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "매입채무의증가",
+    "thstrm_amount": "-247897050",
+    "frmtrm_amount": "443732153",
+    "bfefrmtrm_amount": "366434545"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "미지급금의 증가(감소)",
+    "thstrm_amount": "430573744",
+    "frmtrm_amount": "-1715232560",
+    "bfefrmtrm_amount": "1756952070"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "기타유동금융부채의 증가(감소)",
+    "thstrm_amount": "-266223045",
+    "frmtrm_amount": "148826502",
+    "bfefrmtrm_amount": "3815139"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "예수금의 증가(감소)",
+    "thstrm_amount": "-7180800",
+    "frmtrm_amount": "10000000",
+    "bfefrmtrm_amount": "0"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "금융보증부채의감소",
+    "thstrm_amount": "0",
+    "frmtrm_amount": "0",
+    "bfefrmtrm_amount": "-441816967"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "장기미지급금의 증가(감소)",
+    "thstrm_amount": "0",
+    "frmtrm_amount": "20400000",
+    "bfefrmtrm_amount": "0"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "사채상환할증금의 감소",
+    "thstrm_amount": null,
+    "frmtrm_amount": null,
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "퇴직금의 지급",
+    "thstrm_amount": "1056948222",
+    "frmtrm_amount": "813054080",
+    "bfefrmtrm_amount": "209198490"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "퇴직급여충당금승계액",
+    "thstrm_amount": "0",
+    "frmtrm_amount": "58125045",
+    "bfefrmtrm_amount": "0"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "퇴직보험예치금의 감소",
+    "thstrm_amount": null,
+    "frmtrm_amount": null,
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "이자수취",
+    "thstrm_amount": "125674",
+    "frmtrm_amount": "5049746",
+    "bfefrmtrm_amount": "65118531"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "이자지급",
+    "thstrm_amount": "-1643116140",
+    "frmtrm_amount": "-1559123538",
+    "bfefrmtrm_amount": "-1708333990"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "법인세납부(환급)",
+    "thstrm_amount": "0",
+    "frmtrm_amount": "0",
+    "bfefrmtrm_amount": "0"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "투자활동현금흐름",
+    "thstrm_amount": "-652289240",
+    "frmtrm_amount": "-999172270",
+    "bfefrmtrm_amount": "-6210498139"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "단기금융상품의 처분",
+    "thstrm_amount": null,
+    "frmtrm_amount": "0",
+    "bfefrmtrm_amount": "1505884077"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "장기금융상품의 처분",
+    "thstrm_amount": "0",
+    "frmtrm_amount": "40000000",
+    "bfefrmtrm_amount": "2000000"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "보증금의 감소",
+    "thstrm_amount": "118674061",
+    "frmtrm_amount": "60714000",
+    "bfefrmtrm_amount": "9000000"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "유형자산의 처분",
+    "thstrm_amount": "794545",
+    "frmtrm_amount": "1306650909",
+    "bfefrmtrm_amount": "21577706"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "단기금융상품의 취득",
+    "thstrm_amount": "0",
+    "frmtrm_amount": "0",
+    "bfefrmtrm_amount": "249736073"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "장기금융상품의 취득",
+    "thstrm_amount": "90000000",
+    "frmtrm_amount": "70000000",
+    "bfefrmtrm_amount": "0"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "단기대여금및수취채권의 취득",
+    "thstrm_amount": "0",
+    "frmtrm_amount": "3989790",
+    "bfefrmtrm_amount": "13643135"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "보증금의 증가",
+    "thstrm_amount": "80000000",
+    "frmtrm_amount": "45379300",
+    "bfefrmtrm_amount": "107488000"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "유형자산의 취득",
+    "thstrm_amount": "-28860428",
+    "frmtrm_amount": "-1873145384",
+    "bfefrmtrm_amount": "-7336667171"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "건설중인자산의증가",
+    "thstrm_amount": null,
+    "frmtrm_amount": null,
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "무형자산의 취득",
+    "thstrm_amount": "-572897418",
+    "frmtrm_amount": "-414022705",
+    "bfefrmtrm_amount": "-41425543"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "재무활동현금흐름",
+    "thstrm_amount": "6404402725",
+    "frmtrm_amount": "1862508688",
+    "bfefrmtrm_amount": "10113343368"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "단기차입금의 증가",
+    "thstrm_amount": "11206178141",
+    "frmtrm_amount": "28612150553",
+    "bfefrmtrm_amount": "27403036583"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "장기차입금의 증가",
+    "thstrm_amount": "0",
+    "frmtrm_amount": "1300000000",
+    "bfefrmtrm_amount": "300000000"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "금융리스부채의 증가",
+    "thstrm_amount": null,
+    "frmtrm_amount": null,
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "신주인수권부사채의발행가액",
+    "thstrm_amount": null,
+    "frmtrm_amount": "0",
+    "bfefrmtrm_amount": "4000000000"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "유상증자",
+    "thstrm_amount": "997183335",
+    "frmtrm_amount": "0",
+    "bfefrmtrm_amount": "3990232656"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "주식발행초과금의 증가",
+    "thstrm_amount": null,
+    "frmtrm_amount": null,
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "신주인수권의행사",
+    "thstrm_amount": "3765403770",
+    "frmtrm_amount": "0",
+    "bfefrmtrm_amount": "301193888"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "단기차입금의 상환",
+    "thstrm_amount": "7055972886",
+    "frmtrm_amount": "24461375780",
+    "bfefrmtrm_amount": "23487922159"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "유동성장기부채의감소",
+    "thstrm_amount": "-451992000",
+    "frmtrm_amount": "-16678000",
+    "bfefrmtrm_amount": "-1412347600"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "유동성금융리스부채의감소",
+    "thstrm_amount": "-587236663",
+    "frmtrm_amount": "-266516105",
+    "bfefrmtrm_amount": "0"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "금융리스부채의 지급",
+    "thstrm_amount": "0",
+    "frmtrm_amount": "-494290000",
+    "bfefrmtrm_amount": "0"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "신주인수권부사채의상환가액",
+    "thstrm_amount": "-1577247370",
+    "frmtrm_amount": "-2810781980",
+    "bfefrmtrm_amount": "0"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "자기주식의 처분",
+    "thstrm_amount": "108086398",
+    "frmtrm_amount": "0",
+    "bfefrmtrm_amount": "0"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "신주인수권의매입소각",
+    "thstrm_amount": "0",
+    "frmtrm_amount": "0",
+    "bfefrmtrm_amount": "-980850000"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "환율변동효과 반영전 현금및현금성자산의 순증가(감소)",
+    "thstrm_amount": "-8588455",
+    "frmtrm_amount": "-482915844",
+    "bfefrmtrm_amount": "207671048"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "현금및현금성자산에 대한 환율변동효과",
+    "thstrm_amount": "0",
+    "frmtrm_amount": "0",
+    "bfefrmtrm_amount": "0"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "기초현금및현금성자산",
+    "thstrm_amount": "38550939",
+    "frmtrm_amount": "521466783",
+    "bfefrmtrm_amount": "313795735"
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "기말현금및현금성자산",
+    "thstrm_amount": "29962484",
+    "frmtrm_amount": "38550939",
+    "bfefrmtrm_amount": "521466783"
+  }
+]

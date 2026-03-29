@@ -46,7 +46,13 @@ from src.dart_api import (
     get_api_key,
     CORP_XML_PATH,
 )
-from src.collector import collect_batch, generate_missing_legacy_csv, MISSING_LEGACY_CSV
+from src.collector import (
+    collect_batch,
+    generate_missing_csv,
+    generate_missing_legacy_csv,
+    MISSING_CSV,
+    MISSING_LEGACY_CSV,
+)
 
 
 def cmd_collect(args: argparse.Namespace) -> int:
@@ -151,6 +157,72 @@ def cmd_collect_legacy(args: argparse.Namespace) -> int:
             s3_bucket=args.s3_bucket,
             s3_region=args.s3_region,
             force=args.force,
+        )
+        print(f"결과 파일 ({len(saved_files)}개):")
+        for f in saved_files:
+            print(f"  {f}")
+        return 0
+    except (DartApiError, FileNotFoundError, ValueError) as e:
+        print(f"오류: {e}", file=sys.stderr)
+        return 1
+
+
+def cmd_retry(args: argparse.Namespace) -> int:
+    """누락 데이터 탐지 및 재수집.
+
+    1) companies_collected.csv vs output 디렉터리를 비교하여 누락 탐지
+    2) --stock-codes 지정 시 해당 종목만 필터링
+    3) companies_missing.csv 생성 → collect_batch 실행
+    """
+    try:
+        import csv as _csv
+
+        output_dir = Path(args.output_dir) if args.output_dir else None
+
+        # 누락 목록 생성
+        missing_csv = generate_missing_csv(output_dir=output_dir)
+        print("", file=sys.stderr)
+
+        # --stock-codes 필터링
+        if args.stock_codes:
+            codes = set(args.stock_codes)
+            rows = []
+            with open(missing_csv, newline="", encoding="utf-8-sig") as f:
+                reader = _csv.DictReader(f)
+                fieldnames = reader.fieldnames
+                for row in reader:
+                    if row["stock_code"] in codes:
+                        rows.append(row)
+
+            if not rows:
+                print(f"지정한 종목코드에 누락 데이터가 없습니다: {args.stock_codes}")
+                return 0
+
+            # 필터링된 목록으로 덮어쓰기
+            with open(missing_csv, "w", newline="", encoding="utf-8-sig") as f:
+                writer = _csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(rows)
+
+            total = sum(int(r["end_year"]) - int(r["start_year"]) + 1 for r in rows)
+            print(f"  → {len(rows)}개 구간, {total}건으로 필터링됨\n", file=sys.stderr)
+
+        if args.check_only:
+            print(f"누락 목록: {missing_csv}")
+            return 0
+
+        # 누락 데이터 수집
+        saved_files = collect_batch(
+            companies_csv=missing_csv,
+            fs_div=args.fs_div,
+            output_dir=output_dir,
+            api_key=args.api_key,
+            delay=args.delay,
+            save_raw=args.save_raw,
+            upload_s3=args.upload_s3,
+            s3_bucket=args.s3_bucket,
+            s3_region=args.s3_region,
+            force=True,  # 누락 데이터이므로 항상 강제 수집
         )
         print(f"결과 파일 ({len(saved_files)}개):")
         for f in saved_files:
@@ -284,6 +356,43 @@ def build_parser() -> argparse.ArgumentParser:
         help="중복 체크를 무시하고 전체 재수집",
     )
     legacy_p.set_defaults(func=cmd_collect_legacy)
+
+    # ── retry (누락 재수집) ──
+    retry_p = sub.add_parser(
+        "retry",
+        help="누락 데이터 탐지 및 재수집 (legacy + 2015 이후 모두)",
+    )
+    retry_p.add_argument(
+        "--stock-codes", nargs="+",
+        help="재수집할 종목코드 목록 (미지정 시 전체 누락 대상)",
+    )
+    retry_p.add_argument(
+        "--check-only", action="store_true",
+        help="누락 목록만 생성하고 수집은 하지 않음",
+    )
+    retry_p.add_argument(
+        "--fs-div", default="CFS", choices=["CFS", "OFS"],
+        help="CFS=연결재무제표, OFS=별도재무제표 (기본: CFS)",
+    )
+    retry_p.add_argument(
+        "--output-dir", "-o",
+        help="output 디렉터리 경로 (기본: data/output/)",
+    )
+    retry_p.add_argument(
+        "--delay", type=float, default=0.5,
+        help="API 호출 간 대기(초) (기본: 0.5)",
+    )
+    retry_p.add_argument(
+        "--save-raw", action="store_true",
+        help="원본 재무제표 JSON을 data/raw/에 저장",
+    )
+    retry_p.add_argument(
+        "--upload-s3", action="store_true",
+        help="원본 재무제표 JSON을 S3에 업로드",
+    )
+    retry_p.add_argument("--s3-bucket", help="S3 버킷 이름")
+    retry_p.add_argument("--s3-region", help="AWS 리전")
+    retry_p.set_defaults(func=cmd_retry)
 
     return parser
 
