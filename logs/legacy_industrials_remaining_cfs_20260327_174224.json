@@ -1,0 +1,11 @@
+{
+  "summary": {
+    "total_jobs": 34,
+    "ok": 34,
+    "fail": 0,
+    "timeout": 0,
+    "elapsed_sec_total": 370.2
+  },
+  "fail": [],
+  "timeout": []
+}

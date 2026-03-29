@@ -1,0 +1,10 @@
+{
+  "started_at": "2026-03-27 17:21:47",
+  "elapsed_sec_total": 802.3,
+  "total_jobs": 93,
+  "ok": 93,
+  "fail": 0,
+  "timeout": 0,
+  "failed_items": [],
+  "timeout_items": []
+}

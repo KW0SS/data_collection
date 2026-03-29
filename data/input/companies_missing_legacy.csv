@@ -1,26 +1,20 @@
 ﻿stock_code,corp_name,label,gics_sector,start_year,end_year
 052670,제일바이오,1,Health Care,2010,2014
 057880,푸른소나무,1,Health Care,2011,2014
-024810,이화전기,1,Industrials,2011,2014
-044060,조광ILI,1,Industrials,2011,2014
 072520,제넨바이오,1,Health Care,2011,2014
-029960,코엔텍,1,Industrials,2011,2014
 080000,에스엔유,1,Information Technology,2011,2014
 065560,녹원씨엔아이,1,Materials,2011,2014
 006580,대양제지,1,Materials,2011,2014
 058220,아리온,1,Information Technology,2011,2014
 048260,오스템임플란트,1,Health Care,2007,2014
-050540,엠피씨플러스,1,Industrials,2005,2014
-126870,뉴로스,1,Industrials,2012,2014
-050320,에스에이치엔엘,1,Industrials,2002,2014
+050540,엠피씨플러스,1,Industrials,2005,2007
+050320,에스에이치엔엘,1,Industrials,2002,2007
 053660,현진소재,1,Materials,2002,2014
-045890,GV,1,Industrials,2005,2014
+045890,GV,1,Industrials,2005,2007
 087730,이엠네트웍스,1,Materials,2008,2014
-141070,맥스로텍,1,Industrials,2012,2014
-033430,디에스티,1,Industrials,1998,2014
+033430,디에스티,1,Industrials,1998,2007
 065620,제낙스,1,Materials,2002,2014
-102210,에이치디,1,Industrials,2009,2014
-028040,미래SCI,1,Industrials,1996,2014
+028040,미래SCI,1,Industrials,1996,2007
 065940,바이오빌,1,Materials,2003,2014
 112240,에스에프씨,1,Materials,2011,2014
 122800,썬텍,1,Materials,2010,2014

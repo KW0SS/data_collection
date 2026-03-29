@@ -1,0 +1,1367 @@
+[
+  {
+    "sj_div": "BS",
+    "account_nm": "자산",
+    "thstrm_amount": null,
+    "frmtrm_amount": null,
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "Ⅰ.유동자산",
+    "thstrm_amount": "12728116505",
+    "frmtrm_amount": "9965983839",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "(1)당좌자산",
+    "thstrm_amount": "9608771232",
+    "frmtrm_amount": "8392277102",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "1.현금및현금성자산(주2,15)",
+    "thstrm_amount": "247150676",
+    "frmtrm_amount": "341753008",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "2.단기금융상품(주2,3,8,17,18)",
+    "thstrm_amount": "1769108513",
+    "frmtrm_amount": "1820386949",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "3.매출채권(주17)",
+    "thstrm_amount": "7177402016",
+    "frmtrm_amount": "5877471619",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "대손충당금(주2)",
+    "thstrm_amount": "-206877280",
+    "frmtrm_amount": "-123090640",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "4.미수금(주17)",
+    "thstrm_amount": "437862200",
+    "frmtrm_amount": "247997400",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "5.미수수익(주17)",
+    "thstrm_amount": "38848023",
+    "frmtrm_amount": "42249196",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "6.선급금",
+    "thstrm_amount": "92975913",
+    "frmtrm_amount": "70156470",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "7.선급비용",
+    "thstrm_amount": "11802013",
+    "frmtrm_amount": "18885398",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "8.선급법인세",
+    "thstrm_amount": "11132278",
+    "frmtrm_amount": "22157811",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "9.이연법인세자산(주2,14)",
+    "thstrm_amount": "29366880",
+    "frmtrm_amount": "74309891",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "(2)재고자산(주2)",
+    "thstrm_amount": "3119345273",
+    "frmtrm_amount": "1573706737",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "1.상품",
+    "thstrm_amount": "2576742704",
+    "frmtrm_amount": "1452041694",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "2.원재료",
+    "thstrm_amount": "542602569",
+    "frmtrm_amount": "121665043",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "Ⅱ.비유동자산",
+    "thstrm_amount": "6705744827",
+    "frmtrm_amount": "7102829924",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "(1)투자자산",
+    "thstrm_amount": "3579594120",
+    "frmtrm_amount": "3130245049",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "1.장기금융상품(주2,3)",
+    "thstrm_amount": "4500000",
+    "frmtrm_amount": "4500000",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "2.장기대여금(주17)",
+    "thstrm_amount": "170004720",
+    "frmtrm_amount": "143128720",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "3.관계회사대여금(주17)",
+    "thstrm_amount": "450000000",
+    "frmtrm_amount": "450000000",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "4.매도가능증권(주2,4)",
+    "thstrm_amount": "2852034926",
+    "frmtrm_amount": "2414751806",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "5.지분법적용투자주식(주2,5)",
+    "thstrm_amount": "103054474",
+    "frmtrm_amount": "117864523",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "(2)유형자산(주2,6)",
+    "thstrm_amount": "2211308780",
+    "frmtrm_amount": "2469941696",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "1.토지(주7,8)",
+    "thstrm_amount": "506418972",
+    "frmtrm_amount": "506418972",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "2.건물(주8)",
+    "thstrm_amount": "1778854078",
+    "frmtrm_amount": "1778854078",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "감가상각누계액",
+    "thstrm_amount": "-263122165",
+    "frmtrm_amount": "-218650814",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "3.기계장치",
+    "thstrm_amount": "2599870304",
+    "frmtrm_amount": "2740533583",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "감가상각누계액",
+    "thstrm_amount": "-2439550792",
+    "frmtrm_amount": "-2387725735",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "4.비품",
+    "thstrm_amount": "383229518",
+    "frmtrm_amount": "374964228",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "감가상각누계액",
+    "thstrm_amount": "-373963076",
+    "frmtrm_amount": "-365938168",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "5.시설장치",
+    "thstrm_amount": "252939999",
+    "frmtrm_amount": "252939999",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "감가상각누계액",
+    "thstrm_amount": "-244317283",
+    "frmtrm_amount": "-234651956",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "6.차량운반구",
+    "thstrm_amount": "70122575",
+    "frmtrm_amount": "70122575",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "감가상각누계액",
+    "thstrm_amount": "-59173350",
+    "frmtrm_amount": "-46925066",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "(3)무형자산(주2,9)",
+    "thstrm_amount": "266579152",
+    "frmtrm_amount": "651615824",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "1.개발비",
+    "thstrm_amount": "220718000",
+    "frmtrm_amount": "581534900",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "2.소프트웨어",
+    "thstrm_amount": "45861152",
+    "frmtrm_amount": "70080924",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "(4)기타비유동자산",
+    "thstrm_amount": "648262775",
+    "frmtrm_amount": "851027355",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "1.보증금",
+    "thstrm_amount": "541474120",
+    "frmtrm_amount": "574054120",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "2.이연법인세자산(주2,14)",
+    "thstrm_amount": "106788655",
+    "frmtrm_amount": "276973235",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "자산총계",
+    "thstrm_amount": "19433861332",
+    "frmtrm_amount": "17068813763",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "부채",
+    "thstrm_amount": null,
+    "frmtrm_amount": null,
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "Ⅰ.유동부채",
+    "thstrm_amount": "8111669114",
+    "frmtrm_amount": "4483442183",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "1.매입채무(주17)",
+    "thstrm_amount": "5338051781",
+    "frmtrm_amount": "3523320829",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "2.단기차입금(주18)",
+    "thstrm_amount": "2173078343",
+    "frmtrm_amount": "444890214",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "3.미지급금",
+    "thstrm_amount": "172587778",
+    "frmtrm_amount": "117920944",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "4.선수금",
+    "thstrm_amount": "52334528",
+    "frmtrm_amount": "13567400",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "5.예수금",
+    "thstrm_amount": "16917870",
+    "frmtrm_amount": "17776390",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "7.미지급비용",
+    "thstrm_amount": "58772972",
+    "frmtrm_amount": "50361713",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "8.부가세예수금",
+    "thstrm_amount": "39282990",
+    "frmtrm_amount": "91604693",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "9.유동성장기부채(주8,10)",
+    "thstrm_amount": "260642852",
+    "frmtrm_amount": "224000000",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "Ⅱ.비유동부채",
+    "thstrm_amount": "971922386",
+    "frmtrm_amount": "1039244603",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "1.장기차입금(주8,10)",
+    "thstrm_amount": "378749994",
+    "frmtrm_amount": "560000000",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "2.퇴직급여충당부채(주2,11)",
+    "thstrm_amount": "599017092",
+    "frmtrm_amount": "485089303",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "국민연금전환금",
+    "thstrm_amount": "-5844700",
+    "frmtrm_amount": "-5844700",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "부채총계",
+    "thstrm_amount": "9083591500",
+    "frmtrm_amount": "5522686786",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "자본",
+    "thstrm_amount": null,
+    "frmtrm_amount": null,
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "Ⅰ.자본금(주12)",
+    "thstrm_amount": "3714750000",
+    "frmtrm_amount": "3714750000",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "1.보통주자본금",
+    "thstrm_amount": "3714750000",
+    "frmtrm_amount": "3714750000",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "Ⅱ.자본잉여금",
+    "thstrm_amount": "5504111180",
+    "frmtrm_amount": "5504111180",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "1.주식발행초과금",
+    "thstrm_amount": "5504111180",
+    "frmtrm_amount": "5504111180",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "Ⅲ.기타포괄손익누계액(주16)",
+    "thstrm_amount": "286593883",
+    "frmtrm_amount": "-206198590",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "1.매도가능증권평가손실(주4)",
+    "thstrm_amount": "350132995",
+    "frmtrm_amount": "-142659478",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "2.부의지분법자본변동(주5)",
+    "thstrm_amount": "-63539112",
+    "frmtrm_amount": "-63539112",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "Ⅳ.이익잉여금",
+    "thstrm_amount": "844814769",
+    "frmtrm_amount": "2533464387",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "1.법정적립금",
+    "thstrm_amount": "45002500",
+    "frmtrm_amount": "45002500",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "2.미처분이익잉여금",
+    "thstrm_amount": "799812269",
+    "frmtrm_amount": "2488461887",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "자본총계",
+    "thstrm_amount": "10350269832",
+    "frmtrm_amount": "11546126977",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "BS",
+    "account_nm": "부채와자본총계",
+    "thstrm_amount": "19433861332",
+    "frmtrm_amount": "17068813763",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "Ⅰ.매출액(주2,17)",
+    "thstrm_amount": "20652169346",
+    "frmtrm_amount": "16212814017",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "1.상품매출액",
+    "thstrm_amount": "13513922652",
+    "frmtrm_amount": "10701459187",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "2.용역매출액",
+    "thstrm_amount": "3284508135",
+    "frmtrm_amount": "4883558255",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "3.제품매출액",
+    "thstrm_amount": "3853738559",
+    "frmtrm_amount": "627796575",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "Ⅱ.매출원가",
+    "thstrm_amount": "17134038134",
+    "frmtrm_amount": "12486837302",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "(1)상품매출원가",
+    "thstrm_amount": "12450471681",
+    "frmtrm_amount": "8769993694",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "1.기초상품재고액",
+    "thstrm_amount": "1452041694",
+    "frmtrm_amount": "823874964",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "2.당기상품매입액(주17)",
+    "thstrm_amount": "13575172691",
+    "frmtrm_amount": "9398160424",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "3.기말상품재고액",
+    "thstrm_amount": "-2576742704",
+    "frmtrm_amount": "-1452041694",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "(2)용역매출원가",
+    "thstrm_amount": "1822139837",
+    "frmtrm_amount": "3246288828",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "(3)제품매출원가",
+    "thstrm_amount": "2861426616",
+    "frmtrm_amount": "470554780",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "1.기초제품재고액",
+    "thstrm_amount": null,
+    "frmtrm_amount": null,
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "2.당기제품제조원가",
+    "thstrm_amount": "2861426616",
+    "frmtrm_amount": "470554780",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "3.기말제품재고액",
+    "thstrm_amount": null,
+    "frmtrm_amount": null,
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "Ⅲ.매출총이익",
+    "thstrm_amount": "3518131212",
+    "frmtrm_amount": "3725976715",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "Ⅳ.판매비와관리비",
+    "thstrm_amount": "4749695993",
+    "frmtrm_amount": "3463556887",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "1.급여",
+    "thstrm_amount": "1547697138",
+    "frmtrm_amount": "1269251690",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "2.퇴직급여(주11)",
+    "thstrm_amount": "163830184",
+    "frmtrm_amount": "110767169",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "3.복리후생비",
+    "thstrm_amount": "210959237",
+    "frmtrm_amount": "187526675",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "4.여비교통비",
+    "thstrm_amount": "93280414",
+    "frmtrm_amount": "60295990",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "5.통신비",
+    "thstrm_amount": "64821661",
+    "frmtrm_amount": "55852683",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "6.세금과공과",
+    "thstrm_amount": "95006950",
+    "frmtrm_amount": "76905917",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "7.임차료",
+    "thstrm_amount": "59753989",
+    "frmtrm_amount": "30089189",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "8.감가상각비(주6)",
+    "thstrm_amount": "458885557",
+    "frmtrm_amount": "393333569",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "9.수선비",
+    "thstrm_amount": "11838291",
+    "frmtrm_amount": "10194860",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "10.보험료",
+    "thstrm_amount": "20143230",
+    "frmtrm_amount": "20069676",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "11.접대비",
+    "thstrm_amount": "189996429",
+    "frmtrm_amount": "191668599",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "12.광고선전비",
+    "thstrm_amount": "85789647",
+    "frmtrm_amount": "97624847",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "13.운반보관비",
+    "thstrm_amount": "57371776",
+    "frmtrm_amount": "50645663",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "14.소모품비",
+    "thstrm_amount": "30194415",
+    "frmtrm_amount": "22314311",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "15.지급수수료",
+    "thstrm_amount": "409147390",
+    "frmtrm_amount": "333049642",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "16.판매수수료",
+    "thstrm_amount": "588314977",
+    "frmtrm_amount": null,
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "17.도서인쇄비",
+    "thstrm_amount": "17550311",
+    "frmtrm_amount": "21725667",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "18.차량유지비",
+    "thstrm_amount": "51024441",
+    "frmtrm_amount": "55578051",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "19.해외출장비",
+    "thstrm_amount": "71716439",
+    "frmtrm_amount": "9539262",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "20.건물관리비",
+    "thstrm_amount": "67285649",
+    "frmtrm_amount": "70668381",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "21.교육훈련비",
+    "thstrm_amount": "68980547",
+    "frmtrm_amount": "31132616",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "22.대손상각비",
+    "thstrm_amount": "83786640",
+    "frmtrm_amount": "85115344",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "23.무형자산상각비(주9)",
+    "thstrm_amount": "245857780",
+    "frmtrm_amount": "246770244",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "24.해외시장개척비",
+    "thstrm_amount": "45962901",
+    "frmtrm_amount": "33415842",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "25.경상연구개발비",
+    "thstrm_amount": "10500000",
+    "frmtrm_amount": null,
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "26.잡비",
+    "thstrm_amount": null,
+    "frmtrm_amount": "21000",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "Ⅴ.영업이익(손실)",
+    "thstrm_amount": "-1231564781",
+    "frmtrm_amount": "262419828",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "Ⅵ.영업외수익",
+    "thstrm_amount": "260580516",
+    "frmtrm_amount": "346301746",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "1.이자수익(주17)",
+    "thstrm_amount": "107714676",
+    "frmtrm_amount": "177308680",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "2.배당금수익(주17)",
+    "thstrm_amount": "26177170",
+    "frmtrm_amount": null,
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "3.외환차익",
+    "thstrm_amount": "971694",
+    "frmtrm_amount": "166859",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "4.수입임대료(주17)",
+    "thstrm_amount": "73968000",
+    "frmtrm_amount": "74018000",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "5.투자자산처분이익",
+    "thstrm_amount": "17061327",
+    "frmtrm_amount": null,
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "6.수입수수료",
+    "thstrm_amount": "33019386",
+    "frmtrm_amount": "673560",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "7.잡이익",
+    "thstrm_amount": "1668263",
+    "frmtrm_amount": "94134647",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "Ⅶ.영업외비용",
+    "thstrm_amount": "627028409",
+    "frmtrm_amount": "137593845",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "1.이자비용",
+    "thstrm_amount": "64932313",
+    "frmtrm_amount": "57245869",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "2.외환차손",
+    "thstrm_amount": "4925477",
+    "frmtrm_amount": "843971",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "3.외화환산손실(주15)",
+    "thstrm_amount": "11221142",
+    "frmtrm_amount": "1105934",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "4.유형자산처분손실",
+    "thstrm_amount": "152324286",
+    "frmtrm_amount": null,
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "5.유형자산폐기손실",
+    "thstrm_amount": null,
+    "frmtrm_amount": "212714",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "6.지분법손실(주5)",
+    "thstrm_amount": "14810049",
+    "frmtrm_amount": "74066921",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "7.기부금",
+    "thstrm_amount": null,
+    "frmtrm_amount": "3900000",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "8.무형자산감액손실(주9)",
+    "thstrm_amount": "367784892",
+    "frmtrm_amount": null,
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "9.잡손실",
+    "thstrm_amount": "11030250",
+    "frmtrm_amount": "218436",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "Ⅷ.법인세비용차감전순이익(손실)",
+    "thstrm_amount": "-1598012674",
+    "frmtrm_amount": "471127729",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "Ⅸ.법인세비용(주2,14)",
+    "thstrm_amount": "90636944",
+    "frmtrm_amount": "62386307",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "Ⅹ.당기순이익(손실)",
+    "thstrm_amount": "-1688649618",
+    "frmtrm_amount": "408741422",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "ⅩⅠ.주당손익(주13)",
+    "thstrm_amount": null,
+    "frmtrm_amount": null,
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "IS",
+    "account_nm": "1.기본주당이익(손실)",
+    "thstrm_amount": "-227",
+    "frmtrm_amount": "55",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "Ⅰ.영업활동으로인한현금흐름",
+    "thstrm_amount": "-1277733416",
+    "frmtrm_amount": "-1346960915",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "1.당기순이익(손실)",
+    "thstrm_amount": "-1688649618",
+    "frmtrm_amount": "408741422",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "2.현금의유출이없는비용등의가산",
+    "thstrm_amount": "1492179388",
+    "frmtrm_amount": "910265961",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "가.퇴직급여(주11)",
+    "thstrm_amount": "163830184",
+    "frmtrm_amount": "110767169",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "나.감가상각비(주6)",
+    "thstrm_amount": "458885557",
+    "frmtrm_amount": "393333569",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "다.대손상각비",
+    "thstrm_amount": "83786640",
+    "frmtrm_amount": "85115344",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "라.무형자산상각비",
+    "thstrm_amount": "258708193",
+    "frmtrm_amount": "246770244",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "마.지분법손실",
+    "thstrm_amount": "14810049",
+    "frmtrm_amount": "74066921",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "바.유형자산처분손실",
+    "thstrm_amount": "152324286",
+    "frmtrm_amount": null,
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "사.유형자산폐기손실",
+    "thstrm_amount": null,
+    "frmtrm_amount": "212714",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "아.무형자산감액손실",
+    "thstrm_amount": "359834479",
+    "frmtrm_amount": null,
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "3.현금의유입이없는수익등의차감",
+    "thstrm_amount": "-18650600",
+    "frmtrm_amount": null,
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "가.매도가능증권처분이익",
+    "thstrm_amount": "18650600",
+    "frmtrm_amount": null,
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "4.영업활동으로인한자산부채의변동",
+    "thstrm_amount": "-1062612586",
+    "frmtrm_amount": "-2665968298",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "가.매출채권의증가",
+    "thstrm_amount": "-1299930397",
+    "frmtrm_amount": "-1734294391",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "나.미수금의증가",
+    "thstrm_amount": "-119864800",
+    "frmtrm_amount": "-72540900",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "다.미수수익의감소",
+    "thstrm_amount": "3401173",
+    "frmtrm_amount": "19043563",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "라.선급금의증가",
+    "thstrm_amount": "-22819443",
+    "frmtrm_amount": "-58081570",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "마.선급비용의감소(증가)",
+    "thstrm_amount": "7083385",
+    "frmtrm_amount": "-3910123",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "바.선급법인세의감소",
+    "thstrm_amount": "11025533",
+    "frmtrm_amount": "22251015",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "사.재고자산의증가",
+    "thstrm_amount": "-1545638536",
+    "frmtrm_amount": "-749831773",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "아.유동성이연법인세자산의감소",
+    "thstrm_amount": "44943011",
+    "frmtrm_amount": "135122946",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "자.이연법인세자산의감소(증가)",
+    "thstrm_amount": "45693933",
+    "frmtrm_amount": "-103756717",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "차.매입채무의증가",
+    "thstrm_amount": "1814730952",
+    "frmtrm_amount": "121526495",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "카.미지급금의증가(감소)",
+    "thstrm_amount": "54666834",
+    "frmtrm_amount": "-144169148",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "타.선수금의증가(감소)",
+    "thstrm_amount": "38767128",
+    "frmtrm_amount": "-8470000",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "파.예수금의감소",
+    "thstrm_amount": "-858520",
+    "frmtrm_amount": "-6381733",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "하.미지급비용의증가(감소)",
+    "thstrm_amount": "8411259",
+    "frmtrm_amount": "-4360113",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "거.부가세예수금의증가(감소)",
+    "thstrm_amount": "-52321703",
+    "frmtrm_amount": "34073267",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "너.퇴직금의지급",
+    "thstrm_amount": "-49902395",
+    "frmtrm_amount": "-112189116",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "Ⅱ.투자활동으로인한현금흐름(주19)",
+    "thstrm_amount": "-400449891",
+    "frmtrm_amount": "888821102",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "1.투자활동으로인한현금유입액",
+    "thstrm_amount": "5165448188",
+    "frmtrm_amount": "7782595059",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "가.단기금융상품의감소",
+    "thstrm_amount": "4873095681",
+    "frmtrm_amount": "7748034947",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "나.장기대여금의회수",
+    "thstrm_amount": "23124000",
+    "frmtrm_amount": "9560112",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "다.매도가능증권의처분",
+    "thstrm_amount": "198650600",
+    "frmtrm_amount": null,
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "라.기계장치의처분",
+    "thstrm_amount": "577907",
+    "frmtrm_amount": null,
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "마.보증금의감소",
+    "thstrm_amount": "70000000",
+    "frmtrm_amount": "25000000",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "2.투자활동으로인한현금유출액",
+    "thstrm_amount": "-5565898079",
+    "frmtrm_amount": "-6893773957",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "가.단기금융상품의취득",
+    "thstrm_amount": "4821817245",
+    "frmtrm_amount": "5661518117",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "나.장기대여금의대여",
+    "thstrm_amount": "50000000",
+    "frmtrm_amount": "20000000",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "다.매도가능증권의취득",
+    "thstrm_amount": null,
+    "frmtrm_amount": "529969485",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "라.기계장치의취득",
+    "thstrm_amount": "414889544",
+    "frmtrm_amount": "121933285",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "마.비품의취득",
+    "thstrm_amount": "8265290",
+    "frmtrm_amount": "2994000",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "바.차량운반구의취득",
+    "thstrm_amount": null,
+    "frmtrm_amount": "12600000",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "사.소프트웨어의증가",
+    "thstrm_amount": "12788000",
+    "frmtrm_amount": "4338000",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "아.개발비의증가",
+    "thstrm_amount": "220718000",
+    "frmtrm_amount": "425421070",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "자.보증금의증가",
+    "thstrm_amount": "37420000",
+    "frmtrm_amount": "115000000",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "Ⅲ.재무활동으로인한현금흐름(주19)",
+    "thstrm_amount": "1583580975",
+    "frmtrm_amount": "200890214",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "1.재무활동으로인한현금유입액",
+    "thstrm_amount": "6626158373",
+    "frmtrm_amount": "1627090214",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "가.단기차입금의증가",
+    "thstrm_amount": "6540658373",
+    "frmtrm_amount": "1627090214",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "나.장기차입금의증가",
+    "thstrm_amount": "85500000",
+    "frmtrm_amount": null,
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "2.재무활동으로인한현금유출액",
+    "thstrm_amount": "-5042577398",
+    "frmtrm_amount": "-1426200000",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "가.단기차입금의상환",
+    "thstrm_amount": "4812470244",
+    "frmtrm_amount": "1182200000",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "나.유동성장기부채의상환",
+    "thstrm_amount": "224000000",
+    "frmtrm_amount": "224000000",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "다.장기차입금의상환",
+    "thstrm_amount": "6107154",
+    "frmtrm_amount": null,
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "라.임대보증금의감소",
+    "thstrm_amount": null,
+    "frmtrm_amount": "20000000",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "Ⅳ.현금의증가(감소)(Ⅰ+Ⅱ+Ⅲ)",
+    "thstrm_amount": "-94602332",
+    "frmtrm_amount": "-257249599",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "Ⅴ.기초의현금",
+    "thstrm_amount": "341753008",
+    "frmtrm_amount": "599002607",
+    "bfefrmtrm_amount": null
+  },
+  {
+    "sj_div": "CF",
+    "account_nm": "Ⅵ.기말의현금",
+    "thstrm_amount": "247150676",
+    "frmtrm_amount": "341753008",
+    "bfefrmtrm_amount": null
+  }
+]
