@@ -16,8 +16,14 @@ Codex는 요청을 아래 태스크로 라우팅한다.
 - 브랜치 비교 + PR 생성이 같이 요청되면 `branch_compare` → `pr_create` 순서.
 - 불명확하면 `branch_compare`부터 시작.
 
+## Routing contract (must)
+- `"PR md 파일 생성해줘"` 계열 요청은 `pr_create`를 끝까지 수행해야 한다.
+- `"브랜치 결합 시 발생할 수 있는 문제점 분석해줘"` 계열 요청은 `branch_compare(route1)`로 수행해야 한다.
+- `pr_create`에서 템플릿 생성만 하고 종료하면 안 된다. 반드시 `## 변경 요약`을 실제 분석 내용으로 채운다.
+- 점검(`PASS/WARN/FAIL`)에 FAIL이 있어도, PR md 생성/요약 작성은 완료한다.
+
 ## Defaults
-- Base: `main`, Head: `HEAD`
+- Base: `origin/main` (없으면 `main`), Head: `HEAD`
 - 다른 로컬 브랜치 비교: `--head-ref <branch>`
 - `--include-worktree`는 head가 현재 체크아웃된 경우만 사용 가능.
 
@@ -49,10 +55,11 @@ python3 run_pipeline.py --status normal --sectors "Materials" --member hann
 사용자 요청에 맞게 `--status`, `--sectors`, `--stock-codes`, `--years`, `--member` 값을 치환해서 제공한다.
 
 ## PR analysis flow
-1. `python3 scripts/pr_pipeline.py --output-json prs/context.json` 실행
-2. `prs/context.json` + `git diff main..HEAD` 읽기
+1. `python3 scripts/pr_pipeline.py --type auto --base origin/main --output-json prs/context.json` 실행
+2. `prs/context.json` + `git diff <base>...<head>` 읽기
 3. 변경된 주요 파일 직접 읽어 코드 의도 파악
-4. `prs/*.md`의 "## 변경 요약" 섹션을 한국어로 작성
+4. `prs/*.md`의 `## 변경 요약` 섹션 placeholder를 실제 내용으로 교체
+5. 최종 응답에 생성 파일 경로 + 기준 브랜치 + 핵심 리스크를 반드시 포함
 
 ### 변경 요약 구조
 - **변경 배경/동기**: 왜 이 변경이 필요했는지 (커밋 메시지 + 코드에서 추론)

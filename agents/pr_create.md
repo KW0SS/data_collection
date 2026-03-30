@@ -7,9 +7,14 @@
 `scripts/pr_pipeline.py`로 PR 설명 파일을 생성하고, 에이전트가 diff를 분석하여 변경 요약을 작성한다.
 
 ## 입력 규칙
-- base 기본값: `main`
+- base 기본값: `origin/main` (없으면 `main`)
 - head 기본값: `HEAD`
 - 파일명 제어가 필요하면 `--issue`, `--work-label` 사용
+
+## 필수 실행 규칙
+- 템플릿 생성만으로 종료 금지.
+- `## 변경 요약`의 `_(에이전트 분석 대기 중)_` 문구는 반드시 실제 분석 내용으로 교체.
+- FAIL 체크가 있어도 PR md 작성/보강은 완료한 뒤 결과를 보고.
 
 ## 실행 명령
 기본 (컨텍스트 JSON 포함):
@@ -41,7 +46,12 @@ python3 scripts/pr_pipeline.py --type auto --base <base> --create-pr --draft
 1. 파이프라인 실행 → `prs/*.md` + `prs/context.json` 생성
 2. `prs/context.json` 읽기 + `git diff <base>...<head>` 분석
 3. 변경된 주요 파일 직접 읽어 코드 의도 파악
-4. `prs/*.md`의 "## 변경 요약" 섹션을 한국어로 작성
+4. `prs/*.md`의 "## 변경 요약" 섹션을 한국어로 작성 (placeholder 제거)
+5. 결과 보고 시 아래 4개를 반드시 포함:
+   - 생성 파일 경로
+   - 비교 기준 (`<base>...<head>`)
+   - 점검 요약 (`PASS/WARN/FAIL`)
+   - 주요 리스크 1~3개
 
 ## 결과 형식
 1. 생성 파일 경로 (`prs/*.md`)
