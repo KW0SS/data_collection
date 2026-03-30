@@ -520,6 +520,12 @@ def main() -> int:
         action="store_true",
         help="수집 대상 기업 목록만 출력하고 종료",
     )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="병렬 수집 워커 수 (기본: 1=순차, 5 권장)",
+    )
     args = parser.parse_args()
     try:
         args.sectors = _normalize_sectors(args.sectors)
@@ -602,6 +608,8 @@ def main() -> int:
         collect_cmd.append("--upload-s3")
     if args.force:
         collect_cmd.append("--force")
+    if args.workers > 1:
+        collect_cmd.extend(["--workers", str(args.workers)])
 
     result = _run(collect_cmd, check=False)
     if result.returncode != 0:
