@@ -3,18 +3,34 @@
 ## 개요
 - PR 타입: `both`
 - 비교 기준: `main...21-refactor-edit-processadd-batch-system`
-- 총 변경: 7개 파일 (7 files changed, 690 insertions(+), 97 deletions(-))
+- 총 변경: 8개 파일 (8 files changed, 584 insertions(+), 138 deletions(-))
 - 설명: 데이터 수집과 구조 변경이 함께 포함된 PR입니다.
 
 ## 변경 요약
 <!-- 에이전트에게 'PR 분석해줘'라고 요청하면 이 섹션을 자동 작성합니다 -->
-_(에이전트 분석 대기 중)_
+**변경 배경/동기**: Materials 정상기업 수집 범위를 확장하는 과정에서 수집 시간이 길고, 중단 시 처음부터 다시 확인해야 하는 비효율이 있었습니다. 이번 변경은 수집 파이프라인에 병렬 워커와 진행 상태 복원 로직을 넣어 재실행 비용을 줄이고, 반복적으로 수행되는 corp code 조회와 상폐 업종코드 조회의 병목을 완화하려는 목적입니다.
+
+**주요 변경 사항**
+- 수집 CLI와 통합 파이프라인에 `--workers` 옵션을 추가해 배치 수집을 병렬 실행할 수 있도록 정리했습니다. 단일 수집, legacy 수집, 누락 재수집, 파이프라인 실행이 같은 워커 옵션을 공유합니다.
+- 수집기 내부를 태스크 기반 실행 구조로 바꾸고, `.collect_progress.json`에 진행 상태를 저장해 중단 후 재시작 시 이미 처리한 `(종목, 연도, 분기)`를 사전 필터링하도록 했습니다.
+- DART corp code XML 파싱 결과와 stock code 인덱스를 프로세스 메모리에 캐시해 반복 조회 비용을 줄였습니다. 종목코드 단독 검색은 선형 탐색 대신 인덱스 조회를 사용합니다.
+- 상폐 기업 업종코드 조회 스크립트는 기존 전체 재조회 방식에서 캐시 재사용, 100건 단위 중간 저장, 3개 워커 병렬 조회로 변경해 재실행과 장시간 작업에 대응하도록 했습니다.
+- PR 정리 과정에서 실행 산출물인 `companies_collected.csv`는 제거하고, PR 설명 파일을 별도로 추가해 브랜치 문서화를 분리했습니다.
+
+**주의할 점**
+- 진행 상태 파일은 현재 `data/output/.collect_progress.json` 단일 경로를 사용하므로, 서로 다른 배치를 동시에 돌리면 체크포인트가 섞일 수 있습니다. 병렬화 자체보다 운영 방식에 주의가 필요합니다.
+- 병렬 수집은 속도는 개선하지만 DART API 호출 수를 동시에 늘리므로, 환경에 따라 rate limit이나 일시 실패가 더 자주 보일 수 있습니다. 워커 수는 보수적으로 운영해야 합니다.
+- 정상기업 수집 범위는 여전히 전역 `start_year/end_year`를 그대로 사용하므로, 최근 상장 종목까지 과거 연도 구간을 조회하게 됩니다. 이 경우 수집은 수행되지만 실제 데이터가 없어 CSV 저장이 생략될 수 있습니다.
+- 상폐 업종코드 캐시는 존재 여부와 누락률 기준으로 재사용되므로, 부분 실패 상태의 캐시가 남아 있으면 이후 상폐 대상 분류 품질에 영향을 줄 수 있습니다.
+
+**영향 범위**: 실행 경로 기준으로는 `collect.py` 직접 실행, `run_pipeline.py` 기반 일괄 수집, `collect.py retry` 기반 누락 재수집, 상폐 기업 업종코드 사전 준비 단계까지 모두 영향을 받습니다. 기능 추가 성격이지만, 병렬 처리와 체크포인트 도입으로 수집 실행 방식과 운영상의 주의점이 함께 바뀌는 변경입니다.
 
 <details>
 <summary>커밋 히스토리</summary>
 
 | hash | date | author | message |
 |---|---|---|---|
+| `62fde47` | 2026-04-01 | hann | docs : write pr md file #21 |
 | `7117168` | 2026-03-30 | hann | refactor : apply async in pipeline #21 |
 | `468f844` | 2026-03-30 | hann | docs : write companies_collected.csv for datat collection of healthy Material Companies #21 |
 | `b222e4f` | 2026-03-29 | hann | refactor : edit delay #21 |
@@ -28,227 +44,14 @@ _(에이전트 분석 대기 중)_
   - `src/collector.py` (수정)
   - `src/dart_api.py` (수정)
 **data/input/**
-  - `data/input/companies_collected.csv` (수정)
-  - `data/input/pipeline_companies.csv` (추가)
+  - `data/input/companies_collected.csv` (삭제)
 **root/**
+  - `.gitignore` (수정)
   - `collect.py` (수정)
   - `f_fetch_induty_codes.py` (수정)
   - `run_pipeline.py` (수정)
-
-</details>
-
-<details>
-<summary>추가한 기업 목록</summary>
-
-| stock_code | corp_name | gics_sector | start_year | end_year |
-|---|---|---|---|---|
-| 001810 | 무림SP | Materials | 2015 | 2025 |
-| 004780 | 대륙제관 | Materials | 2015 | 2025 |
-| 005160 | 동국산업 | Materials | 2015 | 2025 |
-| 005290 | 동진쎄미켐 | Materials | 2015 | 2025 |
-| 006050 | 국영지앤엠 | Materials | 2015 | 2025 |
-| 006920 | 모헨즈 | Materials | 2015 | 2025 |
-| 007530 | 와이엠 | Materials | 2015 | 2025 |
-| 007770 | 한일화학 | Materials | 2015 | 2025 |
-| 008370 | 원풍 | Materials | 2015 | 2025 |
-| 009520 | 포스코엠텍 | Materials | 2015 | 2025 |
-| 009620 | 삼보산업 | Materials | 2015 | 2025 |
-| 009730 | 이렘 | Materials | 2015 | 2025 |
-| 012210 | 삼미금속 | Materials | 2015 | 2025 |
-| 012620 | 원일특강 | Materials | 2015 | 2025 |
-| 013030 | 하이록코리아 | Materials | 2015 | 2025 |
-| 014620 | 성광벤드 | Materials | 2015 | 2025 |
-| 014970 | 삼륭물산 | Materials | 2015 | 2025 |
-| 016100 | 리더스코스메틱 | Materials | 2015 | 2025 |
-| 017480 | 삼현철강 | Materials | 2015 | 2025 |
-| 017510 | 세명전기 | Materials | 2015 | 2025 |
-| 017650 | 대림제지 | Materials | 2015 | 2025 |
-| 017890 | 한국알콜 | Materials | 2015 | 2025 |
-| 018290 | 브이티 | Materials | 2015 | 2025 |
-| 019210 | 와이지-원 | Materials | 2015 | 2025 |
-| 020400 | 대동금속 | Materials | 2015 | 2025 |
-| 021040 | 대호특수강 | Materials | 2015 | 2025 |
-| 021650 | 한국큐빅 | Materials | 2015 | 2025 |
-| 022220 | 티케이지애강 | Materials | 2015 | 2025 |
-| 023160 | 태광 | Materials | 2015 | 2025 |
-| 023410 | 유진기업 | Materials | 2015 | 2025 |
-| 023440 | 제이스코홀딩스 | Materials | 2015 | 2025 |
-| 023600 | 삼보판지 | Materials | 2015 | 2025 |
-| 023790 | 동일스틸럭스 | Materials | 2015 | 2025 |
-| 024840 | KBI메탈 | Materials | 2015 | 2025 |
-| 024880 | 케이피에프 | Materials | 2015 | 2025 |
-| 025550 | 한국선재 | Materials | 2015 | 2025 |
-| 026040 | 제이에스티나 | Materials | 2015 | 2025 |
-| 026910 | 광진실업 | Materials | 2015 | 2025 |
-| 027050 | 코리아나 | Materials | 2015 | 2025 |
-| 027580 | 상보 | Materials | 2015 | 2025 |
-| 030530 | 원익홀딩스 | Materials | 2015 | 2025 |
-| 033050 | 제이엠아이 | Materials | 2015 | 2025 |
-| 033500 | 동성화인텍 | Materials | 2015 | 2025 |
-| 035200 | 프럼파스트 | Materials | 2015 | 2025 |
-| 036640 | HRS | Materials | 2015 | 2025 |
-| 036670 | 삼양케이씨아이 | Materials | 2015 | 2025 |
-| 037230 | 한국팩키지 | Materials | 2015 | 2025 |
-| 037370 | EG | Materials | 2015 | 2025 |
-| 037760 | 쎄니트 | Materials | 2015 | 2025 |
-| 038500 | 삼표시멘트 | Materials | 2015 | 2025 |
-| 039020 | 이건홀딩스 | Materials | 2015 | 2025 |
-| 039240 | 경남스틸 | Materials | 2015 | 2025 |
-| 041930 | 동아화성 | Materials | 2015 | 2025 |
-| 043910 | 자연과환경 | Materials | 2015 | 2025 |
-| 044480 | 빌리언스 | Materials | 2015 | 2025 |
-| 044490 | 태웅 | Materials | 2015 | 2025 |
-| 045060 | 오공 | Materials | 2015 | 2025 |
-| 048410 | 현대바이오 | Materials | 2015 | 2025 |
-| 048830 | 엔피케이 | Materials | 2015 | 2025 |
-| 049550 | 잉크테크 | Materials | 2015 | 2025 |
-| 049830 | 승일 | Materials | 2015 | 2025 |
-| 050760 | 에스폴리텍 | Materials | 2015 | 2025 |
-| 052260 | 현대바이오랜드 | Materials | 2015 | 2025 |
-| 052420 | 오성첨단소재 | Materials | 2015 | 2025 |
-| 052900 | KX하이텍 | Materials | 2015 | 2025 |
-| 053260 | 금강철강 | Materials | 2015 | 2025 |
-| 053620 | 태양 | Materials | 2015 | 2025 |
-| 054410 | 케이피티유 | Materials | 2015 | 2025 |
-| 056700 | 신화인터텍 | Materials | 2015 | 2025 |
-| 059270 | 해성에어로보틱스 | Materials | 2015 | 2025 |
-| 060230 | 제이케이시냅스 | Materials | 2015 | 2025 |
-| 060260 | 뉴보텍 | Materials | 2015 | 2025 |
-| 060380 | 동양에스텍 | Materials | 2015 | 2025 |
-| 060480 | 국일신동 | Materials | 2015 | 2025 |
-| 064760 | 티씨케이 | Materials | 2015 | 2025 |
-| 065420 | 에스아이리소스 | Materials | 2015 | 2025 |
-| 065690 | 파커스 | Materials | 2015 | 2025 |
-| 073640 | 테라사이언스 | Materials | 2015 | 2025 |
-| 074600 | 원익QnC | Materials | 2015 | 2025 |
-| 075970 | 동국알앤에스 | Materials | 2015 | 2025 |
-| 078130 | 국일제지 | Materials | 2015 | 2025 |
-| 079000 | 와토스코리아 | Materials | 2015 | 2025 |
-| 079170 | 한창산업 | Materials | 2015 | 2025 |
-| 079650 | 서산 | Materials | 2015 | 2025 |
-| 080530 | 코디 | Materials | 2015 | 2025 |
-| 081150 | 티플랙스 | Materials | 2015 | 2025 |
-| 082660 | 코스나인 | Materials | 2015 | 2025 |
-| 083470 | 이엠앤아이 | Materials | 2015 | 2025 |
-| 083660 | CSA 코스믹 | Materials | 2015 | 2025 |
-| 086710 | 선진뷰티사이언스 | Materials | 2015 | 2025 |
-| 089010 | 켐트로닉스 | Materials | 2015 | 2025 |
-| 089980 | 상아프론테크 | Materials | 2015 | 2025 |
-| 091970 | 나노캠텍 | Materials | 2015 | 2025 |
-| 092070 | 디엔에프 | Materials | 2015 | 2025 |
-| 092730 | 네오팜 | Materials | 2015 | 2025 |
-| 093380 | 풍강 | Materials | 2015 | 2025 |
-| 095190 | 이엠코리아 | Materials | 2015 | 2025 |
-| 095500 | 미래나노텍 | Materials | 2015 | 2025 |
-| 097870 | 효성오앤비 | Materials | 2015 | 2025 |
-| 101240 | 씨큐브 | Materials | 2015 | 2025 |
-| 101360 | 에코앤드림 | Materials | 2015 | 2025 |
-| 102710 | 이엔에프테크놀로지 | Materials | 2015 | 2025 |
-| 104480 | 티케이케미칼 | Materials | 2015 | 2025 |
-| 104830 | 원익머트리얼즈 | Materials | 2015 | 2025 |
-| 107600 | 새빗켐 | Materials | 2015 | 2025 |
-| 109860 | 동일금속 | Materials | 2015 | 2025 |
-| 110020 | 전진바이오팜 | Materials | 2015 | 2025 |
-| 112290 | 와이씨켐 | Materials | 2015 | 2025 |
-| 114630 | 폴라리스우노 | Materials | 2015 | 2025 |
-| 114840 | 아이패밀리에스씨 | Materials | 2015 | 2025 |
-| 115570 | 스타플렉스 | Materials | 2015 | 2025 |
-| 119500 | 포메탈 | Materials | 2015 | 2025 |
-| 120240 | 대정화금 | Materials | 2015 | 2025 |
-| 121600 | 나노신소재 | Materials | 2015 | 2025 |
-| 121850 | 코이즈 | Materials | 2015 | 2025 |
-| 123330 | 제닉 | Materials | 2015 | 2025 |
-| 126600 | BGF에코머티리얼즈 | Materials | 2015 | 2025 |
-| 128660 | 피제이메탈 | Materials | 2015 | 2025 |
-| 136410 | 아셈스 | Materials | 2015 | 2025 |
-| 137950 | 제이씨케미칼 | Materials | 2015 | 2025 |
-| 138070 | 신진에스엠 | Materials | 2015 | 2025 |
-| 140520 | 대창스틸 | Materials | 2015 | 2025 |
-| 146060 | 율촌 | Materials | 2015 | 2025 |
-| 148930 | 에이치와이티씨 | Materials | 2015 | 2025 |
-| 159910 | 에코글로우 | Materials | 2015 | 2025 |
-| 162300 | 신스틸 | Materials | 2015 | 2025 |
-| 170920 | 엘티씨 | Materials | 2015 | 2025 |
-| 171010 | 램테크놀러지 | Materials | 2015 | 2025 |
-| 171120 | 라이온켐텍 | Materials | 2015 | 2025 |
-| 186230 | 그린플러스 | Materials | 2015 | 2025 |
-| 187790 | 나노 | Materials | 2015 | 2025 |
-| 196700 | 웹스 | Materials | 2015 | 2025 |
-| 198440 | 강동씨앤엘 | Materials | 2015 | 2025 |
-| 198940 | 한주라이트메탈 | Materials | 2015 | 2025 |
-| 203690 | 아크솔루션스 | Materials | 2015 | 2025 |
-| 214260 | 라파스 | Materials | 2015 | 2025 |
-| 217480 | 에스디생명공학 | Materials | 2015 | 2025 |
-| 220260 | 켐트로스 | Materials | 2015 | 2025 |
-| 221980 | 케이디켐 | Materials | 2015 | 2025 |
-| 222420 | 쎄노텍 | Materials | 2015 | 2025 |
-| 222810 | 세토피아 | Materials | 2015 | 2025 |
-| 225430 | 케이엠제약 | Materials | 2015 | 2025 |
-| 225530 | HC보광산업 | Materials | 2015 | 2025 |
-| 226340 | 본느 | Materials | 2015 | 2025 |
-| 227610 | 아우딘퓨쳐스 | Materials | 2015 | 2025 |
-| 228340 | 동양파일 | Materials | 2015 | 2025 |
-| 237880 | 클리오 | Materials | 2015 | 2025 |
-| 238090 | 앤디포스 | Materials | 2015 | 2025 |
-| 239890 | 피엔에이치테크 | Materials | 2015 | 2025 |
-| 240600 | 유진테크놀로지 | Materials | 2015 | 2025 |
-| 241710 | 코스메카코리아 | Materials | 2015 | 2025 |
-| 250930 | 예선테크 | Materials | 2015 | 2025 |
-| 251370 | 와이엠티 | Materials | 2015 | 2025 |
-| 251970 | 펌텍코리아 | Materials | 2015 | 2025 |
-| 252500 | 세화피앤씨 | Materials | 2015 | 2025 |
-| 255220 | SG | Materials | 2015 | 2025 |
-| 256630 | 포인트엔지니어링 | Materials | 2015 | 2025 |
-| 260930 | 씨티케이 | Materials | 2015 | 2025 |
-| 263020 | 디케이앤디 | Materials | 2015 | 2025 |
-| 263770 | 유에스티 | Materials | 2015 | 2025 |
-| 265740 | 엔에프씨 | Materials | 2015 | 2025 |
-| 278280 | 천보 | Materials | 2015 | 2025 |
-| 281740 | 레이크머티리얼즈 | Materials | 2015 | 2025 |
-| 285800 | 진영 | Materials | 2015 | 2025 |
-| 286750 | 나노실리칸첨단소재 | Materials | 2015 | 2025 |
-| 294140 | 레몬 | Materials | 2015 | 2025 |
-| 295310 | 에이치브이엠 | Materials | 2015 | 2025 |
-| 317240 | TS트릴리온 | Materials | 2015 | 2025 |
-| 317330 | 덕산테코피아 | Materials | 2015 | 2025 |
-| 318000 | KBG | Materials | 2015 | 2025 |
-| 318060 | 그래피 | Materials | 2015 | 2025 |
-| 318410 | 비비씨 | Materials | 2015 | 2025 |
-| 332290 | 누보 | Materials | 2015 | 2025 |
-| 340440 | 세림B&G | Materials | 2015 | 2025 |
-| 344860 | 이노진 | Materials | 2015 | 2025 |
-| 348370 | 엔켐 | Materials | 2015 | 2025 |
-| 352090 | 스톰테크 | Materials | 2015 | 2025 |
-| 352480 | 씨앤씨인터내셔널 | Materials | 2015 | 2025 |
-| 352700 | 씨앤투스 | Materials | 2015 | 2025 |
-| 352940 | 인바이오 | Materials | 2015 | 2025 |
-| 354320 | 알멕 | Materials | 2015 | 2025 |
-| 357550 | 석경에이티 | Materials | 2015 | 2025 |
-| 357780 | 솔브레인 | Materials | 2015 | 2025 |
-| 365340 | 성일하이텍 | Materials | 2015 | 2025 |
-| 383310 | 에코프로에이치엔 | Materials | 2015 | 2025 |
-| 388610 | 지에프씨생명과학 | Materials | 2015 | 2025 |
-| 393970 | 대진첨단소재 | Materials | 2015 | 2025 |
-| 396300 | 세아메카닉스 | Materials | 2015 | 2025 |
-| 406820 | 뷰티스킨 | Materials | 2015 | 2025 |
-| 413630 | 씨피시스템 | Materials | 2015 | 2025 |
-| 417500 | 제이아이테크 | Materials | 2015 | 2025 |
-| 420570 | 제이투케이바이오 | Materials | 2015 | 2025 |
-| 425040 | 티이엠씨 | Materials | 2015 | 2025 |
-| 439090 | 마녀공장 | Materials | 2015 | 2025 |
-| 445180 | 퓨릿 | Materials | 2015 | 2025 |
-| 451250 | 삐아 | Materials | 2015 | 2025 |
-| 452280 | 한선엔지니어링 | Materials | 2015 | 2025 |
-| 453860 | 에이에스텍 | Materials | 2015 | 2025 |
-| 457370 | 한켐 | Materials | 2015 | 2025 |
-| 460870 | 에스엠씨지 | Materials | 2015 | 2025 |
-| 474610 | RF시스템즈 | Materials | 2015 | 2025 |
-| 475230 | 엔알비 | Materials | 2015 | 2025 |
-| 475660 | 에스켐 | Materials | 2015 | 2025 |
-| 482630 | 삼양엔씨켐 | Materials | 2015 | 2025 |
-| 489460 | 바이오비쥬 | Materials | 2015 | 2025 |
-| 489500 | 엘케이켐 | Materials | 2015 | 2025 |
-| 950140 | 잉글우드랩 | Materials | 2015 | 2025 |
+**other/**
+  - `prs/21_data-structure-change.md` (추가)
 
 </details>
 
@@ -269,9 +72,9 @@ _(에이전트 분석 대기 중)_
   - [automation] mode=non-s3 checks=3 config=automation/config.json
   - - input_schema: PASS (0ms) Input CSV schema is valid
   - - local_data: WARN (234ms) Local data checked with warnings (missing_raw=50, empty_csv=0)
-  - - log_schema: FAIL (2ms) Log schema validation failed (2 errors)
-  - [automation] report json: automation/reports/20260330_224614_997087_non-s3_report.json
-  - [automation] report md  : automation/reports/20260330_224614_997087_non-s3_report.md
+  - - log_schema: FAIL (3ms) Log schema validation failed (2 errors)
+  - [automation] report json: automation/reports/20260401_133648_393087_non-s3_report.json
+  - [automation] report md  : automation/reports/20260401_133648_393087_non-s3_report.md
   - [automation] overall=FAIL
 
 ## 앞으로 진행할 내용
