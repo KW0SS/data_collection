@@ -393,12 +393,30 @@ def _build_normal_companies(
 
 # ── 상폐 기업 목록 생성 ──────────────────────────────────────────
 def _ensure_induty_cache() -> None:
-    """업종코드 캐시가 없으면 f_fetch_induty_codes.py 실행."""
-    if INDUTY_CACHE.exists():
+    """업종코드 캐시가 없거나 누락률이 높으면 f_fetch_induty_codes.py 실행."""
+    if INDUTY_CACHE.exists() and DELISTED_XLSX.exists():
+        # 캐시 건수 vs 상폐 기업 수 비교 → 누락률 10% 초과 시 재생성
+        df_cached = pd.read_csv(str(INDUTY_CACHE), dtype={"종목코드": str})
+        df_del = pd.read_excel(str(DELISTED_XLSX), dtype={"종목코드": str})
+        df_del = df_del[df_del["종목코드"].str.match(r"^\d{6}$", na=False)]
+        expected = len(df_del)
+        actual = len(df_cached)
+        missing_rate = (expected - actual) / expected if expected > 0 else 0
+
+        if missing_rate <= 0.10:
+            print(f"  업종코드 캐시 사용: {INDUTY_CACHE} ({actual}/{expected}건)")
+            return
+        else:
+            print(
+                f"  ⚠ 업종코드 캐시 누락률 {missing_rate:.0%} "
+                f"({actual}/{expected}건) → 재생성",
+                file=sys.stderr,
+            )
+    elif INDUTY_CACHE.exists():
         print(f"  업종코드 캐시 사용: {INDUTY_CACHE}")
         return
 
-    print("  업종코드 캐시 없음 → f_fetch_induty_codes.py 실행 (DART API 호출, 시간 소요)")
+    print("  업종코드 캐시 생성 → f_fetch_induty_codes.py 실행 (DART API 호출, 시간 소요)")
     if not CORP_CODES_XML.exists():
         print(f"  corp_codes.xml이 없습니다: {CORP_CODES_XML}")
         print("  DART OpenAPI에서 다운로드하세요.")

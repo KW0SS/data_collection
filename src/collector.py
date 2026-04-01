@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import sys
 import threading
@@ -407,7 +408,10 @@ def collect_batch(
                     existing_quarters[(sc, yr)] = eq
 
     # ── 진행 상태 추적 (중단 후 재시작 지원) ────────────────────
-    progress_file = save_dir / ".collect_progress.json"
+    # 배치별 고유 식별자로 progress 파일 분리 (동시 실행 충돌 방지)
+    batch_id_src = "|".join(sorted(c.get("stock_code", "") for c in companies))
+    batch_hash = hashlib.md5(batch_id_src.encode()).hexdigest()[:8]
+    progress_file = save_dir / f".collect_progress_{batch_hash}.json"
     completed_keys: set[str] = set()
     if not force and progress_file.exists():
         try:
@@ -649,7 +653,7 @@ def collect_batch(
     # ── 진행 상태 파일 정리 (정상 완료 시 삭제) ────────────────
     if progress_file.exists():
         progress_file.unlink()
-        print("  🗑️  진행 상태 파일 삭제 (.collect_progress.json)", file=sys.stderr)
+        print(f"  🗑️  진행 상태 파일 삭제 ({progress_file.name})", file=sys.stderr)
 
     # ── S3 업로드 ─────────────────────────────────────────────
     if upload_s3 and s3_upload_queue:

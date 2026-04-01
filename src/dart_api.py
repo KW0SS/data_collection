@@ -97,7 +97,7 @@ def download_corp_codes(api_key: str, out_path: Path = CORP_XML_PATH) -> Path:
 
 # ── 모듈 레벨 캐시 (XML 반복 파싱 방지) ─────────────────────
 _corp_cache: dict[str, list[dict[str, str]]] = {}
-_stock_index: dict[str, dict[str, str]] = {}
+_stock_index: dict[str, dict[str, dict[str, str]]] = {}  # xml_path별 분리
 
 
 def load_corp_codes(xml_path: Path = CORP_XML_PATH) -> list[dict[str, str]]:
@@ -125,10 +125,10 @@ def load_corp_codes(xml_path: Path = CORP_XML_PATH) -> list[dict[str, str]]:
             "modify_date": (node.findtext("modify_date") or "").strip(),
         }
         rows.append(row)
-        # stock_code 인덱스 구축 (O(1) 조회용)
+        # stock_code 인덱스 구축 (O(1) 조회용, xml_path별 분리)
         sc = row["stock_code"]
         if sc:
-            _stock_index[sc] = row
+            _stock_index.setdefault(key, {})[sc] = row
 
     _corp_cache[key] = rows
     return rows
@@ -143,10 +143,11 @@ def find_corp(
     """기업명 또는 종목코드로 DART corp_code 검색."""
     rows = load_corp_codes(xml_path)
 
-    # stock_code 단독 검색 → O(1) 인덱스 활용
+    # stock_code 단독 검색 → O(1) 인덱스 활용 (xml_path별)
     stock_q = (stock_code or "").strip()
     if stock_q and not corp_name:
-        hit = _stock_index.get(stock_q)
+        idx = _stock_index.get(str(xml_path), {})
+        hit = idx.get(stock_q)
         return [hit] if hit else []
 
     results: list[dict[str, str]] = []
