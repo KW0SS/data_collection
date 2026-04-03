@@ -77,6 +77,7 @@ def cmd_collect(args: argparse.Namespace) -> int:
             s3_bucket=args.s3_bucket,
             s3_region=args.s3_region,
             force=args.force,
+            workers=args.workers,
         )
         print(f"결과 파일 ({len(saved_files)}개):")
         for f in saved_files:
@@ -157,6 +158,7 @@ def cmd_collect_legacy(args: argparse.Namespace) -> int:
             s3_bucket=args.s3_bucket,
             s3_region=args.s3_region,
             force=args.force,
+            workers=args.workers,
         )
         print(f"결과 파일 ({len(saved_files)}개):")
         for f in saved_files:
@@ -223,6 +225,7 @@ def cmd_retry(args: argparse.Namespace) -> int:
             s3_bucket=args.s3_bucket,
             s3_region=args.s3_region,
             force=True,  # 누락 데이터이므로 항상 강제 수집
+            workers=args.workers,
         )
         print(f"결과 파일 ({len(saved_files)}개):")
         for f in saved_files:
@@ -295,6 +298,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--force", action="store_true",
         help="중복 체크를 무시하고 전체 재수집 (기존 데이터 덮어쓰기)"
     )
+    collect_p.add_argument(
+        "--workers", type=int, default=1,
+        help="병렬 수집 워커 수 (기본: 1=순차, 5 권장)"
+    )
     collect_p.set_defaults(func=cmd_collect)
 
     # ── search ──
@@ -355,6 +362,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--force", action="store_true",
         help="중복 체크를 무시하고 전체 재수집",
     )
+    legacy_p.add_argument(
+        "--workers", type=int, default=1,
+        help="병렬 수집 워커 수 (기본: 1=순차, 5 권장)",
+    )
     legacy_p.set_defaults(func=cmd_collect_legacy)
 
     # ── retry (누락 재수집) ──
@@ -392,6 +403,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     retry_p.add_argument("--s3-bucket", help="S3 버킷 이름")
     retry_p.add_argument("--s3-region", help="AWS 리전")
+    retry_p.add_argument(
+        "--workers", type=int, default=1,
+        help="병렬 수집 워커 수 (기본: 1=순차, 5 권장)",
+    )
     retry_p.set_defaults(func=cmd_retry)
 
     return parser

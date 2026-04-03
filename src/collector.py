@@ -8,10 +8,13 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import sys
+import threading
 import time
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
@@ -310,6 +313,7 @@ def collect_batch(
     s3_bucket: str | None = None,
     s3_region: str | None = None,
     force: bool = False,
+    workers: int = 1,
 ) -> list[Path]:
     """
     여러 기업 × 연도 × 분기의 재무비율을 수집하여 CSV 저장.
@@ -403,111 +407,191 @@ def collect_batch(
                 if eq:
                     existing_quarters[(sc, yr)] = eq
 
-    # ── 결과 수집 ──────────────────────────────────────────────
-    new_rows: list[dict[str, Any]] = []
-    s3_upload_queue: list[dict[str, Any]] = []
-    total = sum(len(_resolve_years(c)) * len(quarters) for c in companies)
-    done = 0
-    skipped = 0
+    # ── 진행 상태 추적 (중단 후 재시작 지원) ────────────────────
+    # 배치별 고유 식별자로 progress 파일 분리 (동시 실행 충돌 방지)
+    batch_id_src = "|".join(sorted(c.get("stock_code", "") for c in companies))
+    batch_hash = hashlib.md5(batch_id_src.encode()).hexdigest()[:8]
+    progress_file = save_dir / f".collect_progress_{batch_hash}.json"
+    completed_keys: set[str] = set()
+    if not force and progress_file.exists():
+        try:
+            completed_keys = set(json.loads(progress_file.read_text()))
+            if completed_keys:
+                print(
+                    f"  ♻️  이전 진행 상태 복원: {len(completed_keys)}건 완료됨",
+                    file=sys.stderr,
+                )
+        except (json.JSONDecodeError, OSError):
+            completed_keys = set()
+
+    def _save_progress() -> None:
+        """현재 진행 상태를 파일에 저장."""
+        progress_file.write_text(json.dumps(list(completed_keys)))
+
+    # ── 태스크 목록 생성 (병렬 처리용) ────────────────────────
+    tasks: list[dict[str, Any]] = []
+    total = 0
+    skipped_early = 0
 
     for comp in companies:
         cc = comp.get("corp_code", "")
         sc = comp.get("stock_code", "")
         cn = comp.get("corp_name", "")
         gics = comp.get("gics_sector", "Unknown")
+        label = comp.get("label", "")
         comp_years = _resolve_years(comp)
+
         if not cc:
             print(f"  ⏭ 건너뜀 (corp_code 없음): {sc} {cn}", file=sys.stderr)
-            done += len(comp_years) * len(quarters)
+            total += len(comp_years) * len(quarters)
+            skipped_early += len(comp_years) * len(quarters)
             continue
 
         for yr in comp_years:
             is_legacy = int(yr) < LEGACY_CUTOFF_YEAR
 
             if is_legacy:
-                # 2015년 이전: dart-fss로 사업보고서(ANNUAL) 단위 수집
-                done += len(quarters)  # legacy는 분기 루프 대신 연도 단위
-
-                # ── 중복 체크 ──
+                total += len(quarters)
+                progress_key = f"{sc}_{yr}_ANNUAL"
+                if progress_key in completed_keys:
+                    skipped_early += len(quarters)
+                    continue
                 if not force and "ANNUAL" in existing_quarters.get((sc, yr), set()):
-                    print(
-                        f"  [{done}/{total}] {cn or sc} {yr}-ANNUAL ... "
-                        f"⏭ 이미 수집됨 (SKIP)",
-                        file=sys.stderr,
-                    )
-                    skipped += len(quarters)
+                    skipped_early += len(quarters)
+                    completed_keys.add(progress_key)
                     continue
+                tasks.append({
+                    "cc": cc, "sc": sc, "cn": cn, "gics": gics,
+                    "label": label, "yr": yr, "q": "ANNUAL",
+                    "is_legacy": True, "progress_key": progress_key,
+                })
+            else:
+                for q in quarters:
+                    total += 1
+                    progress_key = f"{sc}_{yr}_{q}"
+                    if progress_key in completed_keys:
+                        skipped_early += 1
+                        continue
+                    if not force and q in existing_quarters.get((sc, yr), set()):
+                        skipped_early += 1
+                        completed_keys.add(progress_key)
+                        continue
+                    tasks.append({
+                        "cc": cc, "sc": sc, "cn": cn, "gics": gics,
+                        "label": label, "yr": yr, "q": q,
+                        "is_legacy": False, "progress_key": progress_key,
+                    })
 
-                print(
-                    f"  [{done}/{total}] {cn or sc} {yr}-ANNUAL ... "
-                    f"수집 중 (dart-fss)",
-                    file=sys.stderr,
-                )
+    if skipped_early:
+        print(
+            f"  ⏭ 사전 필터링: {skipped_early}건 스킵 (이미 수집/완료)",
+            file=sys.stderr,
+        )
 
-                # CFS 시도 → 실패하면 OFS 폴백
+    # ── 병렬 수집 ────────────────────────────────────────────
+    new_rows: list[dict[str, Any]] = []
+    s3_upload_queue: list[dict[str, Any]] = []
+    lock = threading.Lock()
+    done = skipped_early
+    skipped = skipped_early
+    effective_workers = max(1, min(workers, len(tasks)))
+
+    if effective_workers > 1:
+        print(
+            f"  🚀 병렬 수집 시작: {len(tasks)}건, {effective_workers} workers",
+            file=sys.stderr,
+        )
+    else:
+        print(f"  수집 시작: {len(tasks)}건", file=sys.stderr)
+
+    def _process_task(task: dict[str, Any]) -> dict[str, Any] | None:
+        """단일 태스크 처리 (워커 스레드에서 실행)."""
+        cc = task["cc"]
+        sc = task["sc"]
+        cn = task["cn"]
+        yr = task["yr"]
+        q = task["q"]
+        gics = task["gics"]
+        label = task["label"]
+
+        with lock:
+            nonlocal done
+            done += (len(quarters) if task["is_legacy"] else 1)
+            current_done = done
+        print(
+            f"  [{current_done}/{total}] {cn or sc} {yr}-{q} ... 수집 중"
+            + (" (dart-fss)" if task["is_legacy"] else ""),
+            file=sys.stderr,
+        )
+
+        if task["is_legacy"]:
+            row, raw_items = collect_single_legacy(
+                key, cc, sc, cn, yr, fs_div, save_raw=save_raw,
+            )
+            if fs_div == "CFS" and all(row.get(n) is None for n in RATIO_NAMES):
                 row, raw_items = collect_single_legacy(
-                    key, cc, sc, cn, yr, fs_div, save_raw=save_raw,
+                    key, cc, sc, cn, yr, "OFS", save_raw=save_raw,
                 )
-                if fs_div == "CFS" and all(row.get(n) is None for n in RATIO_NAMES):
-                    row, raw_items = collect_single_legacy(
-                        key, cc, sc, cn, yr, "OFS", save_raw=save_raw,
-                    )
+        else:
+            row, raw_items = collect_single(
+                key, cc, sc, cn, yr, q, fs_div, save_raw=save_raw,
+            )
+            if fs_div == "CFS" and all(row.get(n) is None for n in RATIO_NAMES):
+                row, raw_items = collect_single(
+                    key, cc, sc, cn, yr, q, "OFS", save_raw=save_raw,
+                )
 
-                row["label"] = comp.get("label", "")
-                row["gics_sector"] = gics
-                new_rows.append(row)
+        row["label"] = label
+        row["gics_sector"] = gics
 
-                if upload_s3 and raw_items:
-                    s3_upload_queue.append({
-                        "raw_items": raw_items,
-                        "stock_code": sc,
-                        "year": yr,
-                        "quarter": "ANNUAL",
-                        "gics_sector": gics,
-                        "label": comp.get("label", ""),
-                    })
+        result: dict[str, Any] = {"row": row, "progress_key": task["progress_key"]}
+        if upload_s3 and raw_items:
+            result["s3_item"] = {
+                "raw_items": raw_items,
+                "stock_code": sc,
+                "year": yr,
+                "quarter": q,
+                "gics_sector": gics,
+                "label": label,
+            }
 
-                if delay > 0:
-                    time.sleep(delay)
-                continue
+        if delay > 0:
+            time.sleep(delay)
+        return result
 
-            for q in quarters:
-                done += 1
-
-                # ── 중복 체크 ──
-                if not force and q in existing_quarters.get((sc, yr), set()):
+    # ── 실행: workers=1이면 순차, >1이면 ThreadPoolExecutor ──
+    if effective_workers <= 1:
+        for task in tasks:
+            result = _process_task(task)
+            if result:
+                new_rows.append(result["row"])
+                completed_keys.add(result["progress_key"])
+                if "s3_item" in result:
+                    s3_upload_queue.append(result["s3_item"])
+                if len(completed_keys) % 10 == 0:
+                    _save_progress()
+    else:
+        with ThreadPoolExecutor(max_workers=effective_workers) as executor:
+            futures = {executor.submit(_process_task, t): t for t in tasks}
+            for future in as_completed(futures):
+                try:
+                    result = future.result()
+                except Exception as e:
+                    task = futures[future]
                     print(
-                        f"  [{done}/{total}] {cn or sc} {yr}-{q} ... "
-                        f"⏭ 이미 수집됨 (SKIP)",
+                        f"  ⚠ 오류 ({task['cn'] or task['sc']} "
+                        f"{task['yr']}-{task['q']}): {e}",
                         file=sys.stderr,
                     )
-                    skipped += 1
                     continue
-
-                print(f"  [{done}/{total}] {cn or sc} {yr}-{q} ... 수집 중", file=sys.stderr)
-
-                # CFS 시도 → 실패하면 OFS 폴백
-                row, raw_items = collect_single(key, cc, sc, cn, yr, q, fs_div, save_raw=save_raw)
-                if fs_div == "CFS" and all(row.get(n) is None for n in RATIO_NAMES):
-                    row, raw_items = collect_single(key, cc, sc, cn, yr, q, "OFS", save_raw=save_raw)
-
-                row["label"] = comp.get("label", "")
-                row["gics_sector"] = gics  # 섹터별 디렉터리 저장용
-                new_rows.append(row)
-
-                # S3 업로드 대기열에 추가
-                if upload_s3 and raw_items:
-                    s3_upload_queue.append({
-                        "raw_items": raw_items,
-                        "stock_code": sc,
-                        "year": yr,
-                        "quarter": q,
-                        "gics_sector": gics,
-                        "label": comp.get("label", ""),
-                    })
-
-                if delay > 0:
-                    time.sleep(delay)
+                if result:
+                    with lock:
+                        new_rows.append(result["row"])
+                        completed_keys.add(result["progress_key"])
+                        if "s3_item" in result:
+                            s3_upload_queue.append(result["s3_item"])
+                        if len(completed_keys) % 10 == 0:
+                            _save_progress()
 
     # ── CSV 저장: 기존 데이터 + 신규 데이터 병합 ──────────────
     # 신규 데이터를 (stock_code, year, gics_sector) 기준으로 그룹핑
@@ -565,6 +649,11 @@ def collect_batch(
         f"  ({len(saved_files)}개 파일 저장)",
         file=sys.stderr,
     )
+
+    # ── 진행 상태 파일 정리 (정상 완료 시 삭제) ────────────────
+    if progress_file.exists():
+        progress_file.unlink()
+        print(f"  🗑️  진행 상태 파일 삭제 ({progress_file.name})", file=sys.stderr)
 
     # ── S3 업로드 ─────────────────────────────────────────────
     if upload_s3 and s3_upload_queue:
